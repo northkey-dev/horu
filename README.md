@@ -546,6 +546,8 @@ There is no central Horu site. With a laptop or Pi you need nothing else: it ser
 
 Your data stays on your devices and is tied to this address, so keep the address once you use it.
 
+The page holds only the app, never your data, and it tells search engines not to list it. On a free GitHub account it is still public for anyone who knows the address (GitHub cannot password-protect Pages there). If you want it less visible, give the Pages repo an unremarkable name, or host the `pwa/dist` folder on another static host such as Cloudflare Pages (`npx wrangler pages deploy pwa/dist`).
+
 Want this copy to work with a laptop too? Put `HORU_APP_URL=https://<your-name>.github.io/horu/` in `.env` next to `package.json` (Docker: the same line in the `.env` of the install folder) and restart Horu, otherwise the laptop refuses the app. The pairing page then shows the code for *Settings → Laptop → Scan QR code*.
 
 From your computer instead of Actions: `HORU_PAGES_REPO=<you>/<you>.github.io npm run deploy`.
