@@ -8,11 +8,11 @@ import type { Cue, JimakuEntry, JimakuFile } from './types.ts';
 const BASE = 'https://jimaku.cc/api';
 const SUBTITLE_EXT = /\.(srt|ass|ssa|vtt)$/i;
 
-export function jimakuClient(getKey: () => string) {
+export function jimakuClient(getKey: () => string, base = BASE) {
   async function api<T>(pathAndQuery: string): Promise<T> {
     const key = getKey();
     if (!key) throw new Error('Jimaku API key missing (Settings).');
-    const res = await fetch(BASE + pathAndQuery, { headers: { Authorization: key }, signal: AbortSignal.timeout(20_000) });
+    const res = await fetch(base + pathAndQuery, { headers: { Authorization: key }, signal: AbortSignal.timeout(20_000) });
     if (!res.ok) throw new Error(`Jimaku ${res.status}: ${await res.text()}`);
     return (await res.json()) as T;
   }

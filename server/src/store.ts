@@ -143,6 +143,16 @@ export function importSession(session: Session, cues: Cue[] | undefined): void {
   save();
 }
 
+/** Changes what a session says about itself (title, episode, ...), not its subtitle lines. */
+export function updateSession(id: string, patch: Partial<Session>): Session | undefined {
+  const session = getSession(id);
+  if (!session) return undefined;
+  Object.assign(session, patch);
+  if (session.jimakuEntryId) db.lastEpisode[String(session.jimakuEntryId)] = session.episode;
+  save();
+  return session;
+}
+
 export function updateSessionCues(id: string, cues: Cue[], subtitleName?: string): void {
   const session = getSession(id);
   if (!session) return;

@@ -16,6 +16,7 @@ Horu is a web app for your phone (it installs to the home screen). It runs on it
 - *TV or other screen*: start an episode on the phone, its clock runs with the episode (or follows Jellyfin, Plex, Kodi or mpv). Subtitles come from [Jimaku](https://jimaku.cc). A mark keeps the lines around that moment and, if you switch it on, the last 20 seconds of room audio from the microphone.
 - *On the phone itself* (Safari or a streaming app, fullscreen): when a line catches you, swipe to Horu; the video keeps playing small and Horu marks the moment you left. Or keep Horu open with the video in picture-in-picture, or mark with a double tap on the back of the phone (iOS Shortcut, needs the laptop).
 - *Laptop + Chrome*: the extension records the tab's audio, so a mark keeps the exact audio and a screenshot. It takes the Japanese subtitles the site itself shows or loads (YouTube, Netflix, Crunchyroll, most web players), so dramas and YouTube work without Jimaku. Whisper fills in lines when there are no subtitles, and picks the line you actually heard.
+- *Laptop + Chrome, without touching the laptop:* **Watch → Start recording in Chrome** (or a Shortcut “Horu record”, see Settings → Laptop → *Mark without opening Horu*) makes the laptop press the extension's shortcut in the front Chrome window (Windows only; the video's tab must be the open one). Horu then reads the page, on any site: tab title, headings, the player's own title and the address words (never the site or the query) name show and episode, the laptop finds the show on Jimaku and loads its subtitles. The next episode is recognised by itself. An episode you chose by hand is never replaced; a doubtful match gets a note with *Not right? Choose it yourself*.
 - Optional subtitle overlay over the video, with unknown words underlined.
 - Out of sync? Tap the subtitle line the moment you hear it.
 
@@ -332,7 +333,7 @@ On your computer (with Tailscale on) open the address from step 4 followed by `/
 1. On the pairing page of step 5 tap **download the extension**. Unzip the file somewhere you will keep it (e.g. `Documents/horu-extension`).
 2. In Chrome open `chrome://extensions`, switch on **Developer mode**, click **Load unpacked** and choose the unzipped folder.
 3. Open the extension's **Options** (on `chrome://extensions` → Horu → *Details* → *Extension options*), enter the Pi's address (`https://horu.your-tailnet.ts.net`) as server address and click **Save**, then **Test connection**: it should say *Connected to Horu*.
-4. Try it: open a video tab, press `Alt+Shift+H` to start recording, and in the app on **Watch** tap **Mark**. The moment appears in the **Inbox**.
+4. Try it: open a video tab, press `Ctrl+Shift+H` (or tap *Start recording in Chrome* on the app's **Watch** page) to start recording, and tap **Mark**. Horu recognises the show and episode from the page. The moment appears in the **Inbox**.
 
 **8. Set up the cards (this Horu has no Anki)**
 
@@ -434,7 +435,7 @@ Every option in **Settings**, in the order of the screen. Settings that belong t
 |---|---|---|
 | **Laptop** | Connect / Change / Disconnect | Pairs a copy of the app hosted on your own GitHub Pages with the laptop: scan the code from the tray icon (*Connect phone…*) or type its Tailscale name. Not needed when the laptop serves the app. *Disconnect* keeps what the phone saved. |
 | | Mark without opening Horu | Steps to set up an iOS Shortcut (Back Tap, Action button, Siri) that sends a mark to the laptop while a video runs full screen. Needs Tailscale on the phone. It counts only while Chrome records the tab or an episode is running on the phone (started in Horu, ended with *End*, or after four hours without the app); otherwise the laptop answers "Nothing marked" and keeps nothing. The shortcut itself records no sound. |
-| | Watch → *Continue* | One tap on an anime starts its next episode with the subtitle file Jimaku lists first. For another episode or file, search below. |
+| | Continue starts at once (*This phone*) | Off by default. On: one tap on an anime under Watch → *Continue* starts its next episode with the subtitle file Jimaku lists first. Off: the tap opens the episode page first, where you can pick another episode or file. |
 | **This phone** | Jimaku API key | Used when an episode runs on a TV or the laptop is off: the phone loads subtitles itself. Free key from jimaku.cc → account. A connected laptop hands its key over by itself. |
 | | Marks waiting for the laptop | How many marks made on the phone alone are still waiting to move to the laptop. |
 | **Cards on this phone** | Cards go to | Where a card goes when the phone makes it. *Laptop, else collect on the phone* (default): the laptop's Anki when reachable, otherwise a file for AnkiMobile/AnkiDroid. *Always the laptop*: cards wait in the inbox until the laptop is on. *Collect on the phone (.apkg)*: with audio and picture, exported as a file. *AnkiConnect on this device*: AnkiDroid with the AnkiConnect Android app, or Anki on another computer. *AnkiMobile, one by one*: opens AnkiMobile per card, text only. |
@@ -518,7 +519,8 @@ The extension has one options page (the server address); otherwise it is control
 
 | Control | What it does |
 |---|---|
-| `Alt+Shift+H` | Start or stop recording the current tab (its audio and subtitles). |
+| `Ctrl+Shift+H` | Start or stop recording the current tab (its audio and subtitles). The phone's *Start recording in Chrome* presses this one. Check at `chrome://extensions/shortcuts` that it is set. |
+| `Alt+Shift+H` | The same, for installations that had it before. In some Chrome versions this combination does not reach extensions; then use `Ctrl+Shift+H`. |
 | `Alt+Shift+J` | Highlight unknown Japanese words on this site (the choice is remembered per site). |
 | Options page (`chrome://extensions` → Horu → Details → Extension options) | Where Horu runs: empty for this computer, or the address of Horu on a Raspberry Pi (and an access token when it is reached without Tailscale). *Test connection* checks it. |
 | Right-click → *Highlight unknown Japanese words on this site* | The same as `Alt+Shift+J`. |
@@ -533,6 +535,7 @@ Horu ships no anime, manga, subtitles, audio or lists of sources. It works on wh
 
 - No account, no server of ours, no central site, no analytics. The app is static files that you serve yourself (from your laptop or Pi, or from your own GitHub Pages); your data lives on your phone and your laptop.
 - The laptop only answers the app, your Tailscale network and its own Chrome extension.
+- While you record a tab, the extension sends the words of that page that name the show (tab title, headings, address words; not the site name or the query) to your own laptop, and only there.
 - API keys you enter stay on the device where you enter them (phone keys never go to the laptop). The optional extra backup copy leaves keys out.
 - Calls go only to the services you set up: Jimaku, AnkiConnect, your AI service, AniList, jpdb, WaniKani, your media or manga server.
 

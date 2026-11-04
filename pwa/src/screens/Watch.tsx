@@ -22,6 +22,7 @@ import {
   takeRemoteMarks,
   tickClock,
   followClock,
+  quickContinue,
   undoPhone,
   videoTime,
   videoTimeAt,
@@ -66,6 +67,26 @@ function MarkButton({ count, flash, onMark }: { count: number; flash?: 'ok' | 'f
 
 // ---------------------------------------------------------------- laptop episode
 
+/** Starts or stops the recording of the laptop's Chrome from here (the laptop presses the extension's shortcut). */
+function useChromeRecording(refresh: () => void) {
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string>();
+  async function toggle(start: boolean) {
+    setBusy(true);
+    setNote(undefined);
+    try {
+      const r = await (start ? api.startRecording() : api.stopRecording());
+      setNote(r.error);
+      refresh();
+    } catch (e) {
+      setNote((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return { busy, note, start: () => toggle(true), stop: () => toggle(false) };
+}
+
 function Session({ status, refreshStatus }: { status: Status; refreshStatus: () => void }) {
   const session = status.session!;
   const [flash, setFlash] = useState<'ok' | 'fail'>();
@@ -77,6 +98,7 @@ function Session({ status, refreshStatus }: { status: Status; refreshStatus: () 
 
   const recording = status.extensionRecording;
   const count = status.sessionMarks + pending;
+  const chrome = useChromeRecording(refreshStatus);
 
   async function mark() {
     if (busy.current) return;
@@ -152,9 +174,31 @@ function Session({ status, refreshStatus }: { status: Status; refreshStatus: () 
         )}
       </div>
 
+      {session.auto && session.detected && session.detected !== 'matched' && (
+        <div className="banner" style={{ marginTop: 16 }}>
+          {session.detected === 'unsure'
+            ? 'Recognised from the page, but Jimaku has several similar names. Check that the subtitles fit.'
+            : 'Recognised from the page, but Jimaku does not know this title: no subtitles.'}{' '}
+          <button
+            className="link"
+            onClick={async () => {
+              await api.endSession();
+              refreshStatus();
+            }}
+          >
+            Not right? Choose it yourself
+          </button>
+        </div>
+      )}
+
       {!recording && (
         <div className="banner" style={{ marginTop: 16 }}>
-          On the laptop, click the Horu icon in Chrome on the anime tab, or press <b>Alt+Shift+H</b>. Once per episode.
+          Open the video in Chrome on the laptop, then{' '}
+          <button className="link" disabled={chrome.busy} onClick={chrome.start}>
+            {chrome.busy ? 'starting…' : 'start the recording from here'}
+          </button>
+          . Or click the Horu icon in Chrome, or press <b>Ctrl+Shift+H</b>.
+          {chrome.note && <div className="hint">{chrome.note}</div>}
         </div>
       )}
 
@@ -476,6 +520,7 @@ function mergeRecent(laptop: Recent[] = [], phone: Recent[] = []): Recent[] {
 
 function StartEpisode({ status, onStarted }: { status?: Status; onStarted: () => void }) {
   const recent = usePoll(() => api.recentSessions(), 60_000);
+  const chrome = useChromeRecording(onStarted);
   const [chosen, setChosen] = useState<'laptop' | 'phone'>();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<JimakuEntry[]>();
@@ -662,6 +707,29 @@ function StartEpisode({ status, onStarted }: { status?: Status; onStarted: () =>
         </>
       ) : (
         <>
+          {mode === 'laptop' && status && (
+            <>
+              <h2>Chrome on the laptop</h2>
+              <div className="group">
+                {status.extensionRecording ? (
+                  <div className="cell">
+                    <span className="grow">Recording</span>
+                    <button className="ghost small" disabled={chrome.busy} onClick={chrome.stop}>
+                      Stop
+                    </button>
+                  </div>
+                ) : (
+                  <button className="list-item action-row" disabled={chrome.busy} onClick={chrome.start}>
+                    <span className="grow">{chrome.busy ? 'Starting…' : 'Start recording in Chrome'}</span>
+                    <Icon name="chevron" size={18} weight={2} className="chev" />
+                  </button>
+                )}
+              </div>
+              <p className="footnote">
+                {chrome.note ?? 'Open the video in Chrome first. Horu reads the page and starts the episode it shows; chosen by hand below, it is left alone.'}
+              </p>
+            </>
+          )}
           {!!history.length && (
             <>
               <h2>Continue</h2>
@@ -671,7 +739,11 @@ function StartEpisode({ status, onStarted }: { status?: Status; onStarted: () =>
                     key={s.id}
                     className="list-item"
                     disabled={busy}
-                    onClick={() => void continueWatching(s)}
+                    onClick={() =>
+                      quickContinue() || !s.jimakuEntryId
+                        ? void continueWatching(s)
+                        : choose({ id: s.jimakuEntryId, name: s.title, anilist_id: s.anilistId }, s.nextEpisode)
+                    }
                   >
                     <span className="grow ellipsis">{s.title}</span>
                     <span className="muted">Episode {s.nextEpisode}</span>
@@ -679,7 +751,7 @@ function StartEpisode({ status, onStarted }: { status?: Status; onStarted: () =>
                   </button>
                 ))}
               </div>
-              <p className="footnote">One tap starts the next episode. For a different one, search below.</p>
+              {quickContinue() && <p className="footnote">One tap starts the next episode. For a different one, search below.</p>}
             </>
           )}
 

@@ -1,4 +1,5 @@
-import type { Msg, VideoDiag, VideoState } from './messages.ts';
+import type { Msg, PageText, VideoDiag, VideoState } from './messages.ts';
+import { textFromPath } from '../../shared/detect.ts';
 
 // Runs in every frame (players are often embedded from other domains). While the
 // tab is being recorded, reports the main video's playback position once per second.
@@ -161,8 +162,61 @@ function setReporting(enabled: boolean): void {
   report();
 }
 
-chrome.runtime.onMessage.addListener((msg: Msg) => {
+// ---- which show and episode is this page? ----
+// Only the words that name it go to the laptop (never the host or the query string), and only while the tab is
+// recorded. shared/detect.ts reads them; texts that agree outvote a site name.
+
+const meta = (name: string) => document.querySelector<HTMLMetaElement>(`meta[property="${name}"], meta[name="${name}"]`)?.content?.trim();
+
+function jsonLdTexts(): PageText[] {
+  const out: PageText[] = [];
+  for (const el of Array.from(document.querySelectorAll('script[type="application/ld+json"]')).slice(0, 6)) {
+    try {
+      const walk = (n: unknown): void => {
+        if (Array.isArray(n)) return n.forEach(walk);
+        if (!n || typeof n !== 'object') return;
+        const o = n as Record<string, unknown>;
+        const series = typeof (o.partOfSeries as { name?: unknown } | undefined)?.name === 'string' ? (o.partOfSeries as { name: string }).name : undefined;
+        if (series && o.episodeNumber !== undefined) out.push({ text: `${series} Episode ${String(o.episodeNumber)}`, weight: 4 });
+        else if (typeof o.name === 'string') out.push({ text: o.name, weight: 3 });
+        Object.values(o).forEach(walk);
+      };
+      walk(JSON.parse(el.textContent ?? ''));
+    } catch {
+      // not JSON
+    }
+  }
+  return out;
+}
+
+function pageTexts(): PageText[] {
+  const texts: PageText[] = [];
+  const add = (text: string | undefined | null, weight: number) => {
+    const t = text?.replace(/s+/g, ' ').trim().slice(0, 200);
+    if (t) texts.push({ text: t, weight });
+  };
+  const session = navigator.mediaSession?.metadata;
+  add(session?.title, 3);
+  add(session?.album, 2);
+  add(session?.artist, 1);
+  add(meta('og:title'), 2);
+  add(document.title, 2);
+  add(meta('twitter:title'), 1);
+  add(document.querySelector('h1')?.textContent, 2);
+  texts.push(...jsonLdTexts().slice(0, 6));
+  const query = new URLSearchParams(location.search);
+  const ep = ['ep', 'episode', 'e'].map((k) => query.get(k)).find((v) => v && /^d{1,4}$/.test(v));
+  add([textFromPath(location.pathname), ep ? `episode ${ep}` : ''].filter(Boolean).join(' '), 1);
+  return texts;
+}
+
+chrome.runtime.onMessage.addListener((msg: Msg, _sender, sendResponse) => {
   if (msg.type === 'reporting') setReporting(msg.enabled);
+  if (msg.type === 'page-texts') {
+    sendResponse(window === window.top ? pageTexts() : undefined);
+    return false;
+  }
+  return false;
 });
 
 chrome.runtime

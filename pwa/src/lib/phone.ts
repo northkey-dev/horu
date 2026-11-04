@@ -59,6 +59,9 @@ export const setPhoneJimakuKey = (key: string) => write(KEY, key.trim());
 export const micWanted = () => read<boolean>(MIC, false);
 export const setMicWanted = (on: boolean) => write(MIC, on);
 export const MIC_SECONDS = 20;
+/** Watch → Continue: one tap starts the next episode (off: the tap opens the episode page first). */
+export const quickContinue = () => read<boolean>('horu-quick-continue', false);
+export const setQuickContinue = (on: boolean) => write('horu-quick-continue', on);
 export const anilistToken = () => read<string>('horu-anilist', '');
 export const setAnilistToken = (token: string) => write('horu-anilist', token.trim());
 

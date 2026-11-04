@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Horu",
   "description": "Mine Japanese from anime without pausing, and see which words you do not know yet on any page.",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true
@@ -52,6 +52,12 @@
         "default": "Alt+Shift+H"
       },
       "description": "Start/stop recording this tab"
+    },
+    "record": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+H"
+      },
+      "description": "Start/stop recording this tab (the phone's remote start presses this)"
     },
     "toggle-highlight": {
       "suggested_key": {

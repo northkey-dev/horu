@@ -131,6 +131,7 @@ export function RemoteMark() {
   const [copied, setCopied] = useState(false);
   // A Shortcut needs the full address, also when the laptop serves this app itself (then the path alone is relative).
   const url = new URL(laptopUrl('/api/mark/remote'), location.href).href;
+  const startUrl = new URL(laptopUrl('/api/recording/start'), location.href).href;
   return (
     <details className="group remote-mark">
       <summary className="cell list-item">
@@ -158,6 +159,16 @@ export function RemoteMark() {
           </li>
           <li>Settings → Accessibility → Touch → Back Tap → Double Tap → Horu mark. Or put it on the Action button, or say “Hey Siri, Horu mark”.</li>
         </ol>
+        <p>
+          Start the recording from the couch the same way: a second Shortcut with <i>Get Contents of URL</i>, Method <b>POST</b>, named “Horu record”, URL{' '}
+          <button
+            className="link"
+            onClick={() => navigator.clipboard.writeText(startUrl).catch(() => prompt('Copy this address', startUrl))}
+          >
+            copy
+          </button>
+          . Say “Hey Siri, Horu record”. The video's tab must be the one open in Chrome on the laptop (Windows).
+        </p>
         <p className="muted">Needs Tailscale on the phone. Without the laptop, switch to Horu instead: it offers a mark at the moment you left the video.</p>
       </div>
     </details>

@@ -72,6 +72,10 @@ export type Session = {
   watch?: Record<string, number>;
   /** The episode was ticked off in the AniList list (shared/anilist.ts) */
   listSynced?: boolean;
+  /** Made by the page recognition, not chosen by hand: a new page may replace it (shared/detect.ts) */
+  auto?: boolean;
+  /** How sure the recognition is: found on Jimaku, found but unsure, or only the page's words */
+  detected?: 'matched' | 'unsure' | 'guess';
 };
 
 export type CardRequest = {

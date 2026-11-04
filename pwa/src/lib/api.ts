@@ -195,6 +195,9 @@ export const api = {
     return request<Cue[]>('GET', `/api/sessions/${sessionId}/cues?from=${from}&to=${to}`);
   },
   endSession: () => request('POST', '/api/sessions/end'),
+  /** Presses Alt+Shift+H in Chrome on the laptop (Windows): starts or stops the extension's recording. */
+  startRecording: () => request<{ recording: boolean; error?: string }>('POST', '/api/recording/start', undefined, {}, 30_000),
+  stopRecording: () => request<{ recording: boolean; error?: string }>('POST', '/api/recording/stop', undefined, {}, 30_000),
 
   mark: () => request<Moment>('POST', '/api/mark'),
   undo: () => request<{ removed: Moment | null }>('POST', '/api/undo'),

@@ -1,5 +1,5 @@
 import { parseSubtitles } from '../../shared/subtitles.ts';
-import { API_PATHS, authHeaders, loadServer, type Msg } from './messages.ts';
+import { API_PATHS, authHeaders, loadServer, type Msg, type PageText } from './messages.ts';
 
 // Service worker: toggles recording when the toolbar icon is clicked, owns the
 // offscreen document and takes screenshots (offscreen pages cannot). Also the bridge between the reading
@@ -48,6 +48,8 @@ async function start(tab: chrome.tabs.Tab): Promise<void> {
   await setState({ tabId: tab.id, windowId: tab.windowId });
   await broadcastReporting(tab.id, true);
   if (overlayOn) await setOverlay(true);
+  // The page may still be loading and the player sets its title late: look a few times.
+  for (const wait of [1500, 6000, 15000]) setTimeout(() => void detectPage(tabId), wait);
 }
 
 async function stop(): Promise<void> {
@@ -59,6 +61,7 @@ async function stop(): Promise<void> {
   }
   if (state) await broadcastReporting(state.tabId, false);
   await setState(undefined);
+  lastDetected = '';
 }
 
 async function toggle(tab: chrome.tabs.Tab | undefined): Promise<void> {
@@ -76,12 +79,46 @@ async function toggle(tab: chrome.tabs.Tab | undefined): Promise<void> {
 
 chrome.action.onClicked.addListener((tab) => void toggle(tab));
 
-// Alt+Shift+H (chrome://extensions/shortcuts) does the same as clicking the icon; Alt+Shift+J switches the
+// Alt+Shift+H and Ctrl+Shift+H (chrome://extensions/shortcuts) do the same as clicking the icon; Alt+Shift+J switches the
 // word highlighting for the current site.
 chrome.commands.onCommand.addListener(async (command, tab) => {
   const current = tab ?? (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
-  if (command === 'toggle-recording') void toggle(current);
+  if (command === 'toggle-recording' || command === 'record') void toggle(current);
   if (command === 'toggle-highlight' && current?.url) void toggleSite(current.url);
+});
+
+// ---- which show and episode? (shared/detect.ts reads the page's words on the laptop) ----
+
+let lastDetected = '';
+let detectTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** Sends the recorded page's title words to the laptop, which starts the episode they name (unless one was chosen by hand). */
+async function detectPage(tabId: number): Promise<void> {
+  const state = await getState();
+  if (!state || state.tabId !== tabId) return;
+  const texts = ((await chrome.tabs.sendMessage(tabId, { type: 'page-texts' } satisfies Msg, { frameId: 0 }).catch(() => undefined)) as PageText[] | undefined) ?? [];
+  // The tab's own title is there even when the page's script does not answer.
+  const tab = await chrome.tabs.get(tabId).catch(() => undefined);
+  if (tab?.title && !texts.some((t) => t.text === tab.title)) texts.push({ text: tab.title, weight: 2 });
+  if (!texts.length) return;
+  const key = JSON.stringify(texts);
+  if (key === lastDetected) return;
+  lastDetected = key;
+  const server = await loadServer();
+  await fetch(`${server.url}/api/sessions/detect`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(server) },
+    body: JSON.stringify({ texts }),
+  }).catch(() => {
+    lastDetected = ''; // try again at the next change
+  });
+}
+
+// The next episode is a new address or title in the recorded tab.
+chrome.tabs.onUpdated.addListener((tabId, change) => {
+  if (!change.title && !change.url && change.status !== 'complete') return;
+  clearTimeout(detectTimer);
+  detectTimer = setTimeout(() => void detectPage(tabId), 1500);
 });
 
 // ---- reading help (words.ts) ----

@@ -34,8 +34,13 @@ export type VideoDiag = {
   videos: { duration: number | null; readyState: number; width: number; height: number; paused: boolean; source: 'blob' | 'http' | 'none'; shadow: boolean }[];
 };
 
+/** A text of the page that may name the show and episode, with how much it is trusted (shared/detect.ts). */
+export type PageText = { text: string; weight: number };
+
 export type Msg =
   | VideoState
+  /** service worker → top frame: send the words of the page that name the show (title, headings, player, address) */
+  | { type: 'page-texts' }
   | VideoDiag
   | { type: 'should-report' }
   | { type: 'reporting'; enabled: boolean }

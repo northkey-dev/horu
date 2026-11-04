@@ -2,6 +2,7 @@
 // and checks the main API contracts. Anki, Whisper, Claude and the phone are not needed.
 //   npm run smoke
 import { spawn } from 'node:child_process';
+import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
@@ -19,12 +20,34 @@ for (const f of fs.existsSync(path.join(root, 'data', 'dict')) ? fs.readdirSync(
   fs.copyFileSync(path.join(root, 'data', 'dict', f), path.join(dataDir, 'dict', f));
 }
 
+// A stand-in for jimaku.cc so page recognition can be checked without the internet or a key.
+const JIMAKU_PORT = 7398;
+const SRT = ['1', '00:00:01,000 --> 00:00:03,000', 'こんにちは', '', '2', '00:00:04,000 --> 00:00:06,000', 'さようなら', ''].join('\n');
+const entries = [
+  { id: 11, name: 'Sousou no Frieren', english_name: "Frieren: Beyond Journey's End", japanese_name: '葬送のフリーレン', anilist_id: 154587 },
+  { id: 12, name: 'Kimetsu no Yaiba', english_name: 'Demon Slayer', anilist_id: 101922 },
+];
+const jimaku = http.createServer((req, res) => {
+  const u = new URL(req.url, 'http://x');
+  if (u.pathname === '/entries/search') {
+    const q = (u.searchParams.get('query') ?? '').toLowerCase();
+    const hit = entries.filter((e) => [e.name, e.english_name].some((n) => n.toLowerCase().split(/\W+/).some((w) => w.length > 2 && q.includes(w))));
+    return void res.setHeader('Content-Type', 'application/json').end(JSON.stringify(hit));
+  }
+  if (/^\/entries\/\d+\/files$/.test(u.pathname)) {
+    return void res.setHeader('Content-Type', 'application/json').end(JSON.stringify([{ name: `ep${u.searchParams.get('episode')}.srt`, url: `http://127.0.0.1:${JIMAKU_PORT}/file.srt`, size: SRT.length }]));
+  }
+  res.end(SRT);
+});
+await new Promise((r) => jimaku.listen(JIMAKU_PORT, '127.0.0.1', r));
+
 const server = spawn(process.execPath, [path.join(root, 'server', 'src', 'main.ts')], {
-  env: { ...process.env, HORU_PORT: String(PORT), HORU_DATA: 'data-smoke', HORU_ANKI_URL: 'http://127.0.0.1:9' },
+  env: { ...process.env, HORU_PORT: String(PORT), HORU_DATA: 'data-smoke', HORU_ANKI_URL: 'http://127.0.0.1:9', HORU_JIMAKU_URL: `http://127.0.0.1:${JIMAKU_PORT}` },
   stdio: 'ignore',
 });
 const stop = () => {
   server.kill();
+  jimaku.close();
   fs.rmSync(dataDir, { recursive: true, force: true });
 };
 
@@ -130,6 +153,56 @@ try {
     // The episode ends: taps are refused again.
     await call('POST', '/api/mark/remote/watching', { on: false });
     assert.equal((await remote()).status, 409);
+  });
+
+  await check('page recognition: show and episode from the page texts', async () => {
+    await call('PUT', '/api/settings', { jimakuApiKey: 'test' });
+    const texts = (t) => [{ text: t, weight: 2 }, { text: 'frieren-beyond-journeys-end episode 7', weight: 1 }];
+    const first = (await call('POST', '/api/sessions/detect', { texts: [{ text: "Watch Frieren Beyond Journey's End Episode 7 English Subbed - SiteName", weight: 2 }] })).json;
+    assert.equal(first.status, 'started');
+    assert.equal(first.session.episode, 7);
+    assert.equal(first.session.title, "Frieren: Beyond Journey's End");
+    assert.equal(first.session.detected, 'matched');
+    assert.equal(first.session.jimakuEntryId, 11);
+    assert.equal(first.session.cueCount, 2);
+    assert.equal((await call('POST', '/api/sessions/detect', { texts: texts("SiteName | Frieren Beyond Journey's End Episode 7") })).json.status, 'same');
+    const next = (await call('POST', '/api/sessions/detect', { texts: [{ text: "Frieren Beyond Journey's End Episode 8 - SiteName", weight: 2 }] })).json;
+    assert.equal(next.status, 'started', 'next episode');
+    assert.equal(next.session.episode, 8);
+  });
+
+  await check('page recognition: a show Jimaku does not know, and a page without episode', async () => {
+    const unknown = (await call('POST', '/api/sessions/detect', { texts: [{ text: 'Totally Unknown Show Episode 3 - SiteName', weight: 2 }] })).json;
+    assert.equal(unknown.status, 'started');
+    assert.equal(unknown.session.detected, 'guess');
+    assert.equal(unknown.session.title, 'Totally Unknown Show');
+    assert.equal(unknown.session.episode, 3);
+    assert.equal(unknown.session.cueCount, 0);
+    const none = (await call('POST', '/api/sessions/detect', { texts: [{ text: "Frieren Beyond Journey's End - SiteName", weight: 2 }] })).json;
+    assert.equal(none.session.episode, 1);
+    assert.equal(none.session.cueCount, 0, 'no episode, no subtitles');
+    assert.match(none.warning ?? '', /no episode/i);
+    assert.equal((await call('POST', '/api/sessions/detect', { texts: [{ text: 'Watch Online Free', weight: 2 }] })).json.status, 'none');
+  });
+
+  await check('page recognition: an episode chosen by hand is not replaced', async () => {
+    await call('POST', '/api/sessions', { title: 'Chosen by hand', episode: 2 });
+    const kept = (await call('POST', '/api/sessions/detect', { texts: [{ text: 'Demon Slayer Episode 5', weight: 2 }] })).json;
+    assert.equal(kept.status, 'manual');
+    assert.equal(kept.session.title, 'Chosen by hand');
+    await call('POST', '/api/sessions/end');
+    assert.equal((await call('POST', '/api/sessions/detect', { texts: [{ text: 'Demon Slayer Episode 5', weight: 2 }] })).json.status, 'started');
+  });
+
+  await check('page recognition: a session made from the page subtitles is renamed, its lines stay', async () => {
+    await call('POST', '/api/sessions/end');
+    const cues = [{ start: 1, end: 2, text: '日本語の字幕です' }, { start: 3, end: 4, text: 'もう一行あります' }];
+    await call('POST', '/api/sessions/site-subs', { cues, live: false, page: "Frieren Beyond Journey's End Episode 9 - SiteName" });
+    const renamed = (await call('POST', '/api/sessions/detect', { texts: [{ text: "Frieren Beyond Journey's End Episode 9 - SiteName", weight: 2 }] })).json;
+    assert.equal(renamed.status, 'updated');
+    assert.equal(renamed.session.episode, 9);
+    assert.equal(renamed.session.cueCount, 2);
+    assert.equal(renamed.session.title, "Frieren: Beyond Journey's End");
   });
 
   await check('pwa shell is served', async () => {

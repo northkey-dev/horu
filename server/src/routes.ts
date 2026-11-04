@@ -23,7 +23,9 @@ import { kanjiInfo, KANJI_GZ } from './kanji.ts';
 import { DICT_GZ, dictMeta, dictState, ensureDictionary, lookupIndex } from './dict.ts';
 import { toHiragana, tokenizer } from './japanese.ts';
 import { extensionState } from './extensionHub.ts';
-import { cuesFromUpload, downloadCues, listFiles, searchEntries } from './jimaku.ts';
+import { cuesFromUpload, listFiles, searchEntries } from './jimaku.ts';
+import { detectFromPage, startSessionFor, type StartBody } from './sessions.ts';
+import { setRecording } from './remoteStart.ts';
 import { candidatesAt } from '../../shared/subtitles.ts';
 import { importPhoneMoment, markMoment, receiveCapture, refreshCandidates, runWhisper, undoLastMoment } from './moments.ts';
 import { whisperAvailable } from './whisper.ts';
@@ -162,41 +164,19 @@ export function apiRouter(): express.Router {
 
   r.post(
     '/sessions',
-    h(async (req) => {
-      const body = req.body as { title: string; jimakuEntryId?: number; anilistId?: number; episode: number; fileUrl?: string; fileName?: string };
-      if (!body.title || !Number.isFinite(body.episode)) throw new Error('Title and episode are required');
-      let cues: Cue[] = [];
-      let subtitleName: string | undefined;
-      let warning: string | undefined;
-      if (body.jimakuEntryId) {
-        try {
-          const file = body.fileUrl
-            ? { url: body.fileUrl, name: body.fileName ?? 'subs.srt', size: 0 }
-            : (await listFiles(body.jimakuEntryId, body.episode))[0];
-          if (file) {
-            ({ name: subtitleName, cues } = await downloadCues(file, body.episode));
-          } else {
-            warning = 'No Japanese subtitles on Jimaku for this episode. Whisper will transcribe instead.';
-          }
-        } catch (err) {
-          warning = `Subtitles could not be loaded: ${(err as Error).message}`;
-        }
-      }
-      const session = store.addSession(
-        {
-          id: store.newId(),
-          createdAt: new Date().toISOString(),
-          title: body.title,
-          jimakuEntryId: body.jimakuEntryId,
-          anilistId: body.anilistId,
-          episode: body.episode,
-          subtitleName,
-          cueCount: cues.length,
-        },
-        cues,
-      );
-      log.info(`Session: ${session.title} Ep ${session.episode} (${cues.length} lines)`);
-      return { session, warning };
+    h((req) => startSessionFor(req.body as StartBody)),
+  );
+
+  // What the recorded page shows (title texts and address words from the extension): start that episode.
+  r.post(
+    '/sessions/detect',
+    h((req) => {
+      const raw: unknown = req.body?.texts;
+      const texts = (Array.isArray(raw) ? raw : [])
+        .slice(0, 20)
+        .filter((t): t is { text: string; weight: number } => typeof t?.text === 'string' && t.text.length > 0)
+        .map((t) => ({ text: t.text.slice(0, 300), weight: Math.min(5, Math.max(1, Number(t.weight) || 1)) }));
+      return detectFromPage(texts);
     }),
   );
 
@@ -214,7 +194,7 @@ export function apiRouter(): express.Router {
       if (!clean.length) return { lines: 0 };
       const session =
         store.activeSession() ??
-        store.addSession({ id: store.newId(), createdAt: new Date().toISOString(), title: (page?.trim() || 'Video').slice(0, 90), episode: 1, cueCount: 0 }, []);
+        store.addSession({ id: store.newId(), createdAt: new Date().toISOString(), title: (page?.trim() || 'Video').slice(0, 90), episode: 1, cueCount: 0, auto: true }, []);
       const existing = store.sessionCues(session.id);
       const fromPage = session.subtitleName?.startsWith('From the page') ?? false;
       const wholeTrack = session.subtitleName === 'From the page';
@@ -319,6 +299,10 @@ export function apiRouter(): express.Router {
     if (remoteMarks.length > 50) remoteMarks.shift();
     res.type('text').send('Marked – opens on the phone with the episode clock');
   });
+  // Start or stop the extension's recording from the phone (Windows: the service presses Ctrl+Shift+H in Chrome).
+  r.post('/recording/start', h(() => setRecording(true)));
+  r.post('/recording/stop', h(() => setRecording(false)));
+
   // The phone tells when it starts or ends an episode.
   r.post(
     '/mark/remote/watching',
