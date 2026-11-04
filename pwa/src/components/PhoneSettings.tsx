@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useEventTick } from '../lib/hooks.ts';
-import { localMoments, phoneJimakuKey, quickContinue, setPhoneJimakuKey, setQuickContinue } from '../lib/phone.ts';
+import { localMoments, phoneJimakuKey, quickContinue, setPhoneJimakuKey, setQuickContinue, setTranslatesAhead, translatesAhead } from '../lib/phone.ts';
 
 // Settings → This phone: what the phone needs to watch without the laptop. Stored on the phone only.
 
@@ -25,6 +25,13 @@ export function PhoneSettings() {
           <span className="grow">
             Continue starts at once
             <span className="hint">Watch → Continue: one tap starts the next episode with the first subtitle file. Off: the tap opens the episode page, where you can pick another one.</span>
+          </span>
+        </label>
+        <label className="toggle">
+          <input type="checkbox" checked={translatesAhead()} onChange={(e) => setTranslatesAhead(e.target.checked)} />
+          <span className="grow">
+            Translate ahead
+            <span className="hint">A speech bubble or photo line starts translating when you open it, so Translate answers at once. Costs one AI request per line you open, also if you never press Translate.</span>
           </span>
         </label>
         {waiting > 0 && (

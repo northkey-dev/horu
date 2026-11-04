@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { TokenText } from './TokenText.tsx';
 import { Sheet } from './Sheet.tsx';
-import { translateLine } from '../lib/cards.ts';
+import { translateAhead, translateLine } from '../lib/cards.ts';
 import type { Translation } from '../../../shared/ai.ts';
 
 // Bottom sheet for one piece of text read off a picture (a manga speech bubble, a line on a photo):
@@ -27,6 +27,13 @@ type Props = {
 export function TextSheet({ text, edited, source, context, onEdit, onMine, onClose }: Props) {
   const [translation, setTranslation] = useState<Translation | 'busy' | 'copied' | { error: string }>();
   const [draft, setDraft] = useState<string>();
+
+  // A moment after opening, so flipping through bubbles costs nothing. Closing the sheet cancels it.
+  useEffect(() => {
+    const ahead = setTimeout(() => translateAhead({ text, context, source }), 600);
+    return () => clearTimeout(ahead);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text]);
 
   async function translate() {
     setTranslation('busy');

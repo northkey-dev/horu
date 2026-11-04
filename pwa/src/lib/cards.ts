@@ -7,6 +7,7 @@ import { cardText } from './japanese.ts';
 import { downsample, toWav } from './mic.ts';
 import { recall, remember, mirroredMedia } from './mirror.ts';
 import { api, laptopUp } from './api.ts';
+import { translatesAhead } from './phone.ts';
 
 // Cards made on the phone. The laptop stays the default when it is reachable (its Anki, its AI); without it
 // the phone builds the card itself and sends it to one of these:
@@ -103,25 +104,48 @@ export async function explainOnPhone(service: KeyService, moment: Moment, req: C
 export async function translateLine(input: TranslateInput): Promise<Translation | 'copied'> {
   const p = cardPrefs();
   const cache = `horu-tr:${input.text}`;
+  const running = translating.get(input.text);
+  if (running) return running;
   try {
     const hit = sessionStorage.getItem(cache);
     if (hit) return JSON.parse(hit) as Translation;
   } catch {
     // storage blocked
   }
-  const chosen = p.ai === 'gemini' || p.ai === 'anthropic' || p.ai === 'openai' ? p.ai : undefined;
-  const service = chosen ?? (laptopUp() && p.ai !== 'copy' ? 'laptop' : p.ai === 'copy' ? undefined : firstKey(p));
+  const service = translationService(p);
   if (!service) {
     await navigator.clipboard.writeText(`${translatePrompt(input, profile(p))}\n\nAnswer with only the JSON object, no other text.`);
     return 'copied';
   }
-  const result = service === 'laptop' ? await api.translate(input) : await translateWith({ service, key: p.keys[service] ?? '', model: p.models[service] }, input, profile(p));
-  try {
-    sessionStorage.setItem(cache, JSON.stringify(result));
-  } catch {
-    // storage full or blocked
-  }
-  return result;
+  const run = (service === 'laptop' ? api.translate(input) : translateWith({ service, key: p.keys[service] ?? '', model: p.models[service] }, input, profile(p)))
+    .then((result) => {
+      try {
+        sessionStorage.setItem(cache, JSON.stringify(result));
+      } catch {
+        // storage full or blocked
+      }
+      return result;
+    })
+    .finally(() => translating.delete(input.text));
+  translating.set(input.text, run);
+  return run;
+}
+
+/** Translations under way, so a press on Translate joins the one started ahead instead of asking twice. */
+const translating = new Map<string, Promise<Translation>>();
+
+function translationService(p: CardPrefs) {
+  const chosen = p.ai === 'gemini' || p.ai === 'anthropic' || p.ai === 'openai' ? p.ai : undefined;
+  return chosen ?? (laptopUp() && p.ai !== 'copy' ? ('laptop' as const) : p.ai === 'copy' ? undefined : firstKey(p));
+}
+
+/**
+ * Starts translating a line the moment it is opened (Settings → This phone). Without an AI nothing happens: the
+ * copy-prompt route belongs to a press on Translate, it would overwrite the clipboard. A failure stays silent, the
+ * press asks again and shows it.
+ */
+export function translateAhead(input: TranslateInput): void {
+  if (translatesAhead() && translationService(cardPrefs())) translateLine(input).catch(() => undefined);
 }
 
 /** Remembers what the laptop said about its Anki, for cards the phone builds later. */

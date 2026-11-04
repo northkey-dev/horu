@@ -62,6 +62,9 @@ export const MIC_SECONDS = 20;
 /** Watch → Continue: one tap starts the next episode (off: the tap opens the episode page first). */
 export const quickContinue = () => read<boolean>('horu-quick-continue', false);
 export const setQuickContinue = (on: boolean) => write('horu-quick-continue', on);
+/** A line opened in the reader starts translating right away, so Translate has its answer ready. */
+export const translatesAhead = () => read<boolean>('horu-translate-ahead', true);
+export const setTranslatesAhead = (on: boolean) => write('horu-translate-ahead', on);
 export const anilistToken = () => read<string>('horu-anilist', '');
 export const setAnilistToken = (token: string) => write('horu-anilist', token.trim());
 

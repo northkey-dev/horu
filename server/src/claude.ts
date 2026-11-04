@@ -66,6 +66,11 @@ async function ask(prompt: string, schema: object): Promise<unknown> {
     '--model',
     getSettings().claudeModel,
     '--no-session-persistence',
+    // Nothing of the user's own setup is needed here, and connecting to it costs seconds on every call.
+    '--strict-mcp-config',
+    '--setting-sources',
+    '',
+    '--disable-slash-commands',
   ];
   let stdout: string;
   try {
