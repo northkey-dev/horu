@@ -43,6 +43,8 @@ export type PreparedChapter = {
   chinese?: boolean;
   /** The text recognition runs again; the chapter stays readable meanwhile */
   rereading?: boolean;
+  /** Pages read so far in that run; not set while it waits for its turn */
+  rereadPages?: number;
 };
 
 export type PageBlock = { box: [number, number, number, number]; vertical: boolean; text: string };

@@ -34,6 +34,8 @@ export type PreparedChapter = {
   preparedAt?: string;
   /** The laptop reads the text again; the chapter stays readable */
   rereading?: boolean;
+  /** Pages read so far; not set while the chapter waits for its turn */
+  rereadPages?: number;
   readAt?: string;
   chinese?: boolean;
 };

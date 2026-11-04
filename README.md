@@ -184,7 +184,7 @@ Open a manga from the library to see its chapters. States: *Queued*, *Loading* (
 | Read it without waiting, or without the laptop | **Save on phone** next to a ready chapter. Its pages are stored on the phone and open instantly. |
 | Free the phone's space | **Edit**, then **Off phone** (the chapter stays on the laptop) |
 | Save everything you read onto the phone | **Read → Sync** (the *On this phone* box). **Stop** ends it; what was saved stays. |
-| Run the text recognition again (for chapters from an older Horu) | **Edit**, then **Read text again** on a chapter, or **Read the text of all chapters again**. About five minutes per chapter; the chapter stays readable, and a phone fetches the new text with its next sync. |
+| Run the text recognition again (for chapters from an older Horu) | **Edit**, then **Read text again** on a chapter, or **Read the text of all chapters again**. About five minutes per chapter; the pages are counted under the chapter, it stays readable, and a phone fetches the new text with its next sync. |
 | Stop preparing new chapters of a manga | **Mark as paused** (and *Mark as reading* to continue) |
 | Remove a manga | **Remove** at the bottom of its page |
 | Mark a chapter read (or unread) | **Edit**, then **Mark read** / **Mark unread**. Read chapters are cleaned up after the days set in Settings. |

@@ -148,7 +148,7 @@ let rereading = false;
 export function rereadChapter(key: string): void {
   if (lib.getChapter(key)?.status !== 'ready') throw new Error('Only finished chapters can be read again');
   if (!ocr.available()) throw new Error('Text recognition is not installed on the laptop.');
-  lib.updateChapter(key, { rereading: true });
+  lib.updateChapter(key, { rereading: true, rereadPages: undefined });
   if (!toReread.includes(key)) toReread.push(key);
   void drainRereads();
 }
@@ -163,7 +163,11 @@ async function drainRereads(): Promise<void> {
         const data = lib.readChapterData(key);
         if (!data) continue; // deleted in the meantime
         const pages: lib.ChapterPage[] = [];
-        for (const page of data.pages) pages.push(chapterPage(page.file, await ocr.request<OcrPage>({ file: path.join(lib.chapterDir(key), page.file) })));
+        lib.updateChapter(key, { rereadPages: 0 });
+        for (const page of data.pages) {
+          pages.push(chapterPage(page.file, await ocr.request<OcrPage>({ file: path.join(lib.chapterDir(key), page.file) })));
+          lib.updateChapter(key, { rereadPages: pages.length });
+        }
         lib.writeChapterData({ ...data, pages });
         // A new date, so a phone with this chapter saved fetches the new text with its next sync.
         lib.updateChapter(key, { preparedAt: new Date().toISOString() });
@@ -171,7 +175,7 @@ async function drainRereads(): Promise<void> {
       } catch (err) {
         log.warn(`Reading ${key} again failed`, err);
       } finally {
-        lib.updateChapter(key, { rereading: undefined });
+        lib.updateChapter(key, { rereading: undefined, rereadPages: undefined });
       }
     }
   } finally {

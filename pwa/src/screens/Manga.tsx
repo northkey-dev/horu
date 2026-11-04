@@ -354,8 +354,11 @@ function LocalDetail({ mangaKey, online }: { mangaKey: string; online: boolean }
         status: c.status,
         readAt: c.readAt,
         rereading: c.rereading,
-        detail:
-          c.status === 'downloading' || c.status === 'ocr'
+        detail: c.rereading
+          ? c.rereadPages === undefined
+            ? 'waiting to read the text again'
+            : `reading the text again ${c.rereadPages}/${c.pageCount}`
+          : c.status === 'downloading' || c.status === 'ocr'
             ? `${c.status === 'ocr' ? 'reading text' : 'downloading'} ${c.pagesDone}/${c.pageCount}`
             : c.status === 'error'
               ? c.error
@@ -369,6 +372,7 @@ function LocalDetail({ mangaKey, online }: { mangaKey: string; online: boolean }
 
   const active = chapters.filter((c) => c.status === 'queued' || c.status === 'downloading' || c.status === 'ocr').length;
   const paused = chapters.filter((c) => c.status === 'paused').length;
+  const rereading = chapters.filter((c) => c.rereading).length;
 
   // The chapter being read and the first prepared one after it (chapters arrive sorted by their order).
   const sorted = chapters.slice().sort((x, y) => x.order - y.order);
@@ -438,6 +442,16 @@ function LocalDetail({ mangaKey, online }: { mangaKey: string; online: boolean }
         )}
       </div>
       {!chapters.length && <p className="footnote">Preparing the first chapters on the laptop…</p>}
+      {online && rereading > 0 && (
+        <div className="group">
+          <div className="cell">
+            <span className="spinner" />
+            <div className="grow">
+              Reading the text again: {rereading} chapter{rereading > 1 ? 's' : ''} left
+            </div>
+          </div>
+        </div>
+      )}
       {editing && (
         <div className="group">
           <button className="list-item action-row" disabled={acting === 'reread'} onClick={() => act('reread', () => mangaApi.rereadManga(mangaKey))}>
