@@ -530,7 +530,7 @@ Horu ships no anime, manga, subtitles, audio or lists of sources. It works on wh
 
 ## Privacy
 
-- No account, no server of ours. The app is static files on GitHub Pages; your data lives on your phone and your laptop.
+- No account, no server of ours, no central site, no analytics. The app is static files that you serve yourself (from your laptop or Pi, or from your own GitHub Pages); your data lives on your phone and your laptop.
 - The laptop only answers the app, your Tailscale network and its own Chrome extension.
 - API keys you enter stay on the device where you enter them (phone keys never go to the laptop). The optional extra backup copy leaves keys out.
 - Calls go only to the services you set up: Jimaku, AnkiConnect, your AI service, AniList, jpdb, WaniKani, your media or manga server.
