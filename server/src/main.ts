@@ -20,6 +20,7 @@ import { screenRouter } from './screen.ts';
 import { textRouter } from './text.ts';
 import { hookRouter } from './hook.ts';
 import { startListSync } from './lists.ts';
+import { prepareRemoteStart } from './remoteStart.ts';
 import { log } from './log.ts';
 import { flush, purgeOldMedia } from './store.ts';
 import { refreshFromAnki, refreshServices } from './knownWords.ts';
@@ -90,6 +91,10 @@ app.use((err: Error & { status?: number }, _req: Request, res: Response, _next: 
 });
 
 const server = http.createServer(app);
+// Node drops an idle connection after 5 s by default. `tailscale serve` keeps its connections to us open for reuse,
+// and a request that hits one in that moment is reset. So the proxy has to be the one that gives up first.
+server.keepAliveTimeout = 120_000;
+server.headersTimeout = 125_000;
 const wss = new WebSocketServer({ noServer: true });
 server.on('upgrade', (req, socket, head) => {
   const ip = req.socket.remoteAddress ?? '';
@@ -129,6 +134,7 @@ server.listen(PORT, '0.0.0.0', () => {
   startBackups();
   startListSync();
   startMangaWorker();
+  prepareRemoteStart();
 });
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

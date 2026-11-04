@@ -3,6 +3,7 @@ import path from 'node:path';
 import { DATA_DIR, writeJsonAtomic } from './config.ts';
 import { addNote, ensureAnki, existingTargets } from './anki.ts';
 import { furiganaHtml, readingOf } from './japanese.ts';
+import { escapeHtml, highlight } from '../../shared/furigana.ts';
 import * as store from './store.ts';
 
 // Cards for words from the "Before you watch / read" lists: the example line, no audio, no Claude call.
@@ -28,7 +29,7 @@ async function addOne(c: PreviewCard): Promise<void> {
   const start = sentence.indexOf(c.word);
   const [from, to] = start >= 0 ? [start, start + c.word.length] : [0, 0];
   await addNote({
-    sentence: start >= 0 ? `${sentence.slice(0, from)}<b>${c.word}</b>${sentence.slice(to)}` : sentence,
+    sentence: start >= 0 ? highlight(sentence, from, to) : escapeHtml(sentence),
     sentenceFurigana: await furiganaHtml(sentence, from, to),
     target: c.word,
     targetReading: c.reading && c.reading !== c.word ? c.reading : await readingOf(c.word),

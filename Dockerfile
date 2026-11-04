@@ -59,15 +59,15 @@ RUN set -eux; \
     case ",$MODULES," in *,manga,*|*,whisper,*) python3 -m venv tools/.venv;; esac; \
     case ",$MODULES," in *,manga,*) \
       tools/.venv/bin/pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu; \
-      tools/.venv/bin/pip install --no-cache-dir 'mokuro>=0.2.5' python-bidi pyyaml scikit-image; \
+      tools/.venv/bin/pip install --no-cache-dir 'mokuro==0.2.5' 'python-bidi==0.6.12' 'pyyaml==6.0.3' 'scikit-image==0.26.0'; \
       tools/.venv/bin/pip install --no-cache-dir --no-deps 'easyocr==1.7.2'; \
       tools/.venv/bin/python -c "from mokuro.manga_page_ocr import MangaPageOcr; MangaPageOcr(force_cpu=True)"; \
       tools/.venv/bin/python -c "import easyocr; easyocr.Reader(['en'], gpu=False, recognizer=False, verbose=False)"; \
-      jar_url="$(curl -fsSL https://api.github.com/repos/Suwayomi/Suwayomi-Server/releases/latest | grep -o '"browser_download_url": *"[^"]*\.jar"' | head -1 | sed 's/.*"\(http[^"]*\)"/\1/')"; \
       mkdir -p tools/suwayomi/bin; \
-      curl -fL "$jar_url" -o tools/suwayomi/bin/Suwayomi-Server.jar;; \
+      curl -fL https://github.com/Suwayomi/Suwayomi-Server/releases/download/v2.4.2366/Suwayomi-Server-v2.4.2366.jar -o tools/suwayomi/bin/Suwayomi-Server.jar; \
+      echo 'af9feb20af9d7ebe9e30769e6c6ebc7fc7ab1c447388d42e0280b1da5fe07bfd  tools/suwayomi/bin/Suwayomi-Server.jar' | sha256sum -c -;; \
     esac; \
-    case ",$MODULES," in *,whisper,*) tools/.venv/bin/pip install --no-cache-dir 'faster-whisper>=1.1';; esac; \
+    case ",$MODULES," in *,whisper,*) tools/.venv/bin/pip install --no-cache-dir 'faster-whisper==1.2.1';; esac; \
     chmod -R a+rwX /opt/cache; \
     rm -rf "$HOME"
 

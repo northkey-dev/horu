@@ -4,11 +4,15 @@
 // relative to the worker's scope.
 
 const BASE = new URL(self.registration.scope).pathname;
-const SHELL = 'horu-shell-v1';
+// Filled in by the build (vite.config.ts): every asset of this build, so the whole app is on the phone after the
+// first visit, and a new build gets a new shell while the old one is removed.
+const BUILD = 'dev';
+const ASSETS = [];
+const SHELL = `horu-shell-${BUILD}`;
 const KUROMOJI = 'horu-kuromoji-v1';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(SHELL).then((c) => c.addAll([BASE, BASE + 'manifest.webmanifest', BASE + 'icon-192.png'])));
+  event.waitUntil(caches.open(SHELL).then((c) => c.addAll([BASE, BASE + 'manifest.webmanifest', BASE + 'icon-192.png', ...ASSETS.map((a) => BASE + a)])));
   self.skipWaiting();
 });
 

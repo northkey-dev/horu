@@ -1,5 +1,5 @@
 import { chatPrompt, DEFAULT_PROFILE, explainWith, translatePrompt, translateWith, type AiService, type ExplainInput, type Explanation, type TranslateInput, type Translation } from '../../../shared/ai.ts';
-import { highlight, slug } from '../../../shared/furigana.ts';
+import { escapeHtml, highlight, slug } from '../../../shared/furigana.ts';
 import { BACK, CSS, FIELDS, FRONT, MODEL_NAME } from '../../../shared/notetype.ts';
 import type { CardRequest, Moment, Settings } from '../../../shared/types.ts';
 import { buildApkg, loadSql, type ApkgNote } from './apkg.ts';
@@ -186,15 +186,15 @@ async function build(moment: Moment, req: CardRequest, ai: Explanation | undefin
   const fields: Record<string, string> = {
     Sentence: highlight(sentence, req.targetStart, req.targetEnd),
     SentenceFurigana: furigana,
-    Target: word,
-    TargetReading: ai?.targetReading || reading,
-    TargetMeaning: ai?.targetMeaning ?? '',
-    Translation: ai?.translation ?? '',
-    Explanation: ai?.explanation ?? '',
-    Context: req.context.join('\n'),
+    Target: escapeHtml(word),
+    TargetReading: escapeHtml(ai?.targetReading || reading),
+    TargetMeaning: escapeHtml(ai?.targetMeaning ?? ''),
+    Translation: escapeHtml(ai?.translation ?? ''),
+    Explanation: escapeHtml(ai?.explanation ?? ''),
+    Context: escapeHtml(req.context.join('\n')),
     Audio: audio,
     Image: image,
-    Source: moment.sourceLabel,
+    Source: escapeHtml(moment.sourceLabel),
   };
   return { guid: `horu-${moment.id}`, word, sentence, fields, tags: ['horu', moment.kind, slug(moment.title)].filter(Boolean), media: files };
 }

@@ -49,7 +49,7 @@ export function furiganaHtml(tokens: { surface: string; reading?: string }[], ta
 
 /** Sentence with the target in <b> (the plain Sentence field). */
 export function highlight(sentence: string, start: number, end: number): string {
-  return `${sentence.slice(0, start)}<b>${sentence.slice(start, end)}</b>${sentence.slice(end)}`;
+  return `${escapeHtml(sentence.slice(0, start))}<b>${escapeHtml(sentence.slice(start, end))}</b>${escapeHtml(sentence.slice(end))}`;
 }
 
 /** Reading of a word in hiragana; katakana words stay katakana. */

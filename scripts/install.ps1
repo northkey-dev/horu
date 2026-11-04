@@ -91,23 +91,28 @@ function Pip($packages) {
 
 if (& $want 'whisper') {
   Write-Host '== whisper: faster-whisper' -ForegroundColor Cyan
-  Pip @('faster-whisper>=1.1')
+  Pip @('faster-whisper==1.2.1')
 }
 
 if (& $want 'manga') {
   Write-Host '== manga: mokuro (text recognition)' -ForegroundColor Cyan
-  Pip @('mokuro>=0.2.5')
+  Pip @('mokuro==0.2.5')
   # Photos (Read -> Camera): EasyOCR's text detector. --no-deps keeps it from pulling a second OpenCV and PyTorch.
-  Pip @('python-bidi', 'pyyaml', 'scikit-image')
+  Pip @('python-bidi==0.6.12', 'pyyaml==6.0.3', 'scikit-image==0.26.0')
   & $venvPython -m pip install --quiet --no-deps 'easyocr==1.7.2'
   & $venvPython -c "import easyocr; easyocr.Reader(['en'], gpu=False, recognizer=False, verbose=False)" 2>$null
   $suwa = Join-Path $root 'tools\suwayomi'
   if (-not (Test-Path (Join-Path $suwa 'bin\Suwayomi-Server.jar'))) {
     Write-Host '== manga: Suwayomi (manga sources, includes Java)' -ForegroundColor Cyan
-    $release = Invoke-RestMethod 'https://api.github.com/repos/Suwayomi/Suwayomi-Server/releases/latest'
-    $asset = $release.assets | Where-Object { $_.name -like '*windows-x64.zip' } | Select-Object -First 1
-    $zip = Join-Path $env:TEMP $asset.name
-    Invoke-WebRequest $asset.browser_download_url -OutFile $zip
+    # A fixed version with its checksum, so what is installed is what was tested. To update take both from the release page.
+    $version = 'v2.4.2366'
+    $name = "Suwayomi-Server-$version-windows-x64.zip"
+    $zip = Join-Path $env:TEMP $name
+    Invoke-WebRequest "https://github.com/Suwayomi/Suwayomi-Server/releases/download/$version/$name" -OutFile $zip
+    if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne 'b955f374a8d94b8d1c2750ae28fa7eb2066b479957561b5ba9cf8ac993c8fc13') {
+      Remove-Item $zip -Force
+      throw 'The Suwayomi download does not match its checksum.'
+    }
     $tmp = Join-Path $env:TEMP 'horu-suwayomi'
     if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force }
     Expand-Archive $zip -DestinationPath $tmp

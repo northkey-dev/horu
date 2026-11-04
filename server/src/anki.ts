@@ -1,3 +1,4 @@
+import { escapeHtml } from '../../shared/furigana.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -183,15 +184,15 @@ export async function addNote(input: NoteInput): Promise<number> {
       fields: {
         Sentence: input.sentence,
         SentenceFurigana: input.sentenceFurigana,
-        Target: input.target,
-        TargetReading: input.targetReading,
-        TargetMeaning: input.targetMeaning,
-        Translation: input.translation,
-        Explanation: input.explanation,
-        Context: input.context,
+        Target: escapeHtml(input.target),
+        TargetReading: escapeHtml(input.targetReading),
+        TargetMeaning: escapeHtml(input.targetMeaning),
+        Translation: escapeHtml(input.translation),
+        Explanation: escapeHtml(input.explanation),
+        Context: escapeHtml(input.context),
         Audio: audio,
         Image: image,
-        Source: input.source,
+        Source: escapeHtml(input.source),
       },
       options: { allowDuplicate: true },
       tags: ['horu', ...input.tags],

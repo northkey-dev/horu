@@ -103,6 +103,7 @@ if [ ! -f .env ]; then
 else
   echo "Keeping your existing .env"
 fi
+chmod 600 .env # the Tailscale key is in there
 mkdir -p data
 
 # ---------------------------------------------------------------- image

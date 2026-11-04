@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -25,10 +26,25 @@ function kuromojiDict(): Plugin {
   };
 }
 
+/** Tells the service worker what this build consists of (see BUILD and ASSETS in public/sw.js). */
+function shellList(): Plugin {
+  return {
+    name: 'horu-shell-list',
+    apply: 'build',
+    closeBundle() {
+      const dist = path.resolve(import.meta.dirname, 'dist');
+      const assets = fs.readdirSync(path.join(dist, 'assets')).sort().map((f) => `assets/${f}`);
+      const build = createHash('sha256').update(assets.join()).digest('hex').slice(0, 10);
+      const sw = path.join(dist, 'sw.js');
+      fs.writeFileSync(sw, fs.readFileSync(sw, 'utf8').replace("const BUILD = 'dev';", `const BUILD = '${build}';`).replace('const ASSETS = [];', `const ASSETS = ${JSON.stringify(assets)};`));
+    },
+  };
+}
+
 export default defineConfig({
   // Relative, so the same build runs on GitHub Pages (/horu/) and from the laptop (/).
   base: './',
-  plugins: [react(), kuromojiDict()],
+  plugins: [react(), kuromojiDict(), shellList()],
   // Shown in Settings next to the laptop's, to see whether both run the newest code.
   define: { __APP_VERSION__: JSON.stringify((JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, '../package.json'), 'utf8')) as { version: string }).version) },
   server: {

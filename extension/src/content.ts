@@ -15,10 +15,22 @@ function allVideos(root: ParentNode = document, shadow = false): { el: HTMLVideo
   return found;
 }
 
+// Walking the whole page, shadow roots included, is the expensive part and subtitles are read every 300 ms. A new
+// player does not need to be noticed that fast, so a walk counts for two seconds.
+let found: ReturnType<typeof allVideos> = [];
+let foundAt = 0;
+function videosNow(): ReturnType<typeof allVideos> {
+  if (Date.now() - foundAt > 2000) {
+    found = allVideos();
+    foundAt = Date.now();
+  }
+  return found;
+}
+
 function mainVideo(): HTMLVideoElement | undefined {
   let best: HTMLVideoElement | undefined;
   let bestArea = 0;
-  for (const v of allVideos().map((x) => x.el)) {
+  for (const v of videosNow().map((x) => x.el)) {
     if (!(v.duration > 30) || v.readyState === 0) continue;
     const r = v.getBoundingClientRect();
     const area = r.width * r.height;
@@ -32,7 +44,7 @@ function mainVideo(): HTMLVideoElement | undefined {
 
 let lastDiag = 0;
 function reportDiag(): void {
-  const videos = allVideos().map(({ el, shadow }) => {
+  const videos = videosNow().map(({ el, shadow }) => {
     const r = el.getBoundingClientRect();
     const src = el.currentSrc || el.src;
     return {

@@ -107,12 +107,12 @@ pip_install() {
 
 if want whisper; then
   step "whisper: faster-whisper"
-  pip_install 'faster-whisper>=1.1'
+  pip_install 'faster-whisper==1.2.1'
 fi
 
 if want manga; then
   step "manga: mokuro (text recognition)"
-  pip_install 'mokuro>=0.2.5'
+  pip_install 'mokuro==0.2.5'
   # Photos (Read -> Camera): EasyOCR's text detector. --no-deps keeps it from pulling a second OpenCV and PyTorch.
   pip_install python-bidi pyyaml scikit-image
   "$venv/bin/python" -m pip install --quiet --no-deps 'easyocr==1.7.2' || echo "Installing easyocr failed (photos will use the manga detector)."
@@ -120,9 +120,17 @@ if want manga; then
   jar="$root/tools/suwayomi/bin/Suwayomi-Server.jar"
   if [ ! -f "$jar" ]; then
     step "manga: Suwayomi (manga sources)"
-    url="$(curl -fsSL https://api.github.com/repos/Suwayomi/Suwayomi-Server/releases/latest | grep -o '"browser_download_url": *"[^"]*\.jar"' | head -1 | sed 's/.*"\(http[^"]*\)"/\1/')"
+    # A fixed version with its checksum, so what is installed is what was tested. To update take both from the release page.
+    version=v2.4.2366
     mkdir -p "$(dirname "$jar")"
-    curl -fL "$url" -o "$jar"
+    curl -fL "https://github.com/Suwayomi/Suwayomi-Server/releases/download/$version/Suwayomi-Server-$version.jar" -o "$jar.part"
+    sum="$( (sha256sum "$jar.part" 2>/dev/null || shasum -a 256 "$jar.part") | cut -d' ' -f1)"
+    if [ "$sum" != af9feb20af9d7ebe9e30769e6c6ebc7fc7ab1c447388d42e0280b1da5fe07bfd ]; then
+      rm -f "$jar.part"
+      echo "The Suwayomi download does not match its checksum."
+      exit 1
+    fi
+    mv "$jar.part" "$jar"
   fi
   command -v java >/dev/null 2>&1 || echo "Suwayomi needs Java 21: $(hint openjdk@21 openjdk-21-jre)."
   echo "Manga sources come from an extension repository you add in Settings -> Manga (Horu ships none)."

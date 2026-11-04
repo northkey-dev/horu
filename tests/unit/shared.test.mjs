@@ -116,3 +116,8 @@ test('lang: German and English lines are not Japanese, mixed lines with Japanese
   assert.equal(looksJapanese('12:30'), false);
   assert.equal(looksJapanese('営業時間 9:00-18:00'), true);
 });
+
+test('a card field is text: HTML in a sentence cannot run in Anki', async () => {
+  const { highlight } = await import('../../shared/furigana.ts');
+  assert.equal(highlight('<img src=x onerror=alert(1)>猫だ', 28, 29), '&lt;img src=x onerror=alert(1)&gt;<b>猫</b>だ');
+});

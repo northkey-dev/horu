@@ -1,4 +1,8 @@
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { DATA_DIR } from './config.ts';
 import { extensionState } from './extensionHub.ts';
 import { log } from './log.ts';
 
@@ -13,13 +17,7 @@ import { log } from './log.ts';
  */
 export const SHORTCUT_KEYS = '0x11,0x10,0x48';
 
-const scriptFor = (keys: string) => SCRIPT.replace('KEYS', keys);
-
-const SCRIPT = String.raw`
-$ErrorActionPreference = 'Stop'
-$ProgressPreference = 'SilentlyContinue'
-Add-Type -TypeDefinition @'
-using System;
+const SOURCE = String.raw`using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -74,27 +72,47 @@ public static class HoruWin {
     foreach (var k in keys) Key(k, false);
     for (int i = keys.Length - 1; i >= 0; i--) Key(keys[i], true);
   }
+}`;
+
+// Compiling is slow when Windows has not done it for a while (10 s measured), and a remote start is exactly that. So
+// it happens once: the result stays in the data folder, named after the source.
+const DLL = path.join(DATA_DIR, `remote-keys-${createHash('sha256').update(SOURCE).digest('hex').slice(0, 10)}.dll`);
+const PREPARE = [
+  "$ErrorActionPreference = 'Stop'",
+  "$ProgressPreference = 'SilentlyContinue'",
+  `$dll = '${DLL.replaceAll("'", "''")}'`,
+  `if (-not (Test-Path $dll)) { Add-Type -OutputAssembly $dll -TypeDefinition @'\n${SOURCE}\n'@ }`,
+].join('\n');
+
+function powershell(script: string): Promise<string> {
+  const encoded = Buffer.from(script, 'utf16le').toString('base64');
+  return new Promise((resolve, reject) => {
+    execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], { timeout: 20_000, windowsHide: true }, (err, stdout, stderr) => {
+      if (err) return reject(new Error(stderr.trim().split('\n')[0] || err.message));
+      resolve(stdout);
+    });
+  });
 }
-'@
+
+/** At service start, so the first remote start of the evening has nothing to compile. */
+export function prepareRemoteStart(): void {
+  if (process.platform !== 'win32' || process.env.HORU_DOCKER || fs.existsSync(DLL)) return;
+  powershell(PREPARE).catch((err: Error) => log.warn('Remote start: preparing failed', err.message));
+}
+
+let lastPress = 0;
+
+export async function pressShortcut(keys = SHORTCUT_KEYS): Promise<'SENT' | 'NOCHROME' | 'NOFOCUS'> {
+  const stdout = await powershell(`${PREPARE}
+Add-Type -Path $dll
 $w = [HoruWin]::TopChrome()
 if ($w -eq [IntPtr]::Zero) { Write-Output 'NOCHROME'; exit 0 }
 if (-not [HoruWin]::Front($w)) { Write-Output 'NOFOCUS'; exit 0 }
 Start-Sleep -Milliseconds 200
-[HoruWin]::Press([byte[]]@(KEYS))
-Write-Output 'SENT'
-`;
-
-let lastPress = 0;
-
-export function pressShortcut(keys = SHORTCUT_KEYS): Promise<'SENT' | 'NOCHROME' | 'NOFOCUS'> {
-  const encoded = Buffer.from(scriptFor(keys), 'utf16le').toString('base64');
-  return new Promise((resolve, reject) => {
-    execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], { timeout: 20_000, windowsHide: true }, (err, stdout, stderr) => {
-      if (err) return reject(new Error(stderr.trim().split('\n')[0] || err.message));
-      const out = stdout.trim().split(/\s+/).pop();
-      resolve(out === 'NOCHROME' || out === 'NOFOCUS' ? out : 'SENT');
-    });
-  });
+[HoruWin]::Press([byte[]]@(${keys}))
+Write-Output 'SENT'`);
+  const out = stdout.trim().split(/\s+/).pop();
+  return out === 'NOCHROME' || out === 'NOFOCUS' ? out : 'SENT';
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
