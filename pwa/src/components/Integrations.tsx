@@ -129,7 +129,8 @@ export function ImportSentences() {
 /** Settings → Laptop: an iOS Shortcut that marks without leaving the video (Back Tap, Action button, Siri). */
 export function RemoteMark() {
   const [copied, setCopied] = useState(false);
-  const url = laptopUrl('/api/mark/remote');
+  // A Shortcut needs the full address, also when the laptop serves this app itself (then the path alone is relative).
+  const url = new URL(laptopUrl('/api/mark/remote'), location.href).href;
   return (
     <details className="group remote-mark">
       <summary className="cell list-item">
