@@ -115,6 +115,23 @@ try {
     assert.equal(json.zzzz, false);
   });
 
+  await check('Back Tap marks count only while watching', async () => {
+    const remote = () => call('POST', '/api/mark/remote');
+    // Nothing runs: a knock in the pocket leaves nothing behind.
+    assert.equal((await remote()).status, 409);
+    assert.deepEqual((await call('POST', '/api/mark/remote/take')).json.marks, [], 'rejected tap was queued');
+    // The phone starts an episode: the tap is kept (the take above already renewed it, so end it first).
+    await call('POST', '/api/mark/remote/watching', { on: false });
+    assert.equal((await remote()).status, 409);
+    await call('POST', '/api/mark/remote/watching', { on: true });
+    assert.equal((await remote()).status, 200);
+    const taken = (await call('POST', '/api/mark/remote/take')).json.marks;
+    assert.equal(taken.length, 1);
+    // The episode ends: taps are refused again.
+    await call('POST', '/api/mark/remote/watching', { on: false });
+    assert.equal((await remote()).status, 409);
+  });
+
   await check('pwa shell is served', async () => {
     const res = await fetch(base + '/');
     assert.ok([200, 503].includes(res.status));

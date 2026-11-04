@@ -164,6 +164,7 @@ export async function startPhoneSession(opts: { title: string; entry?: JimakuEnt
   await remember(`cues:${session.id}`, cues);
   accruedAt = Date.now();
   saveCurrent(session);
+  void announceWatching(true);
   return { warning };
 }
 
@@ -171,6 +172,25 @@ export function endPhoneSession(): void {
   const s = currentSession();
   if (s) saveCurrent({ ...accrue(s), clock: { ...s.clock, running: false } });
   write(CURRENT, null);
+  void announceWatching(false);
+}
+
+/**
+ * Tells the laptop that an episode runs on this phone, so it takes marks from a Shortcut (Back Tap) only then.
+ * While the Watch screen is open every pick-up renews it. No laptop, nothing to tell.
+ */
+async function announceWatching(on: boolean): Promise<void> {
+  try {
+    await fetch(laptopUrl('/api/mark/remote/watching'), {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ on }),
+      signal: AbortSignal.timeout(4000),
+    });
+  } catch {
+    // laptop away or not paired
+  }
 }
 
 export async function sessionCues(id: string): Promise<Cue[]> {

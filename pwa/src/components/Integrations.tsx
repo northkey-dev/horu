@@ -138,7 +138,7 @@ export function RemoteMark() {
         <span className="value">Back Tap, Siri</span>
       </summary>
       <div className="cell stacked-text">
-        <p>A Shortcut sends the mark to the laptop: the extension takes it while it records, otherwise this phone places it on the episode clock.</p>
+        <p>A Shortcut sends the mark to the laptop: the extension takes it while it records, otherwise this phone places it on the episode clock. It counts only while Chrome records the tab or an episode is running on this phone, so a knock in your pocket does nothing.</p>
         <ol>
           <li>Shortcuts app → + → <i>Get Contents of URL</i>.</li>
           <li>

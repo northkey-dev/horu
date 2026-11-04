@@ -36,6 +36,12 @@ const require = createRequire(import.meta.url);
 
 /** Wall-clock times (ms) of remote marks waiting for the phone's episode clock. */
 const remoteMarks: number[] = [];
+/**
+ * Until when the phone says an episode runs on it. A Back Tap outside of watching (a knock in a pocket) must not
+ * leave anything behind. Every pick-up of the phone renews it; it ends with the episode or after four hours.
+ */
+let phoneWatchingUntil = 0;
+const WATCHING_MS = 4 * 3600_000;
 const KUROMOJI_DICT = path.join(path.dirname(require.resolve('kuromoji/package.json')), 'dict');
 
 type Handler = (req: Request, res: Response) => Promise<unknown> | unknown;
@@ -306,11 +312,28 @@ export function apiRouter(): express.Router {
         // fall through to the phone
       }
     }
+    if (Date.now() > phoneWatchingUntil) {
+      return void res.status(409).type('text').send('Nothing marked: no episode is running. Start one in Horu, or record the tab in Chrome.');
+    }
     remoteMarks.push(at);
     if (remoteMarks.length > 50) remoteMarks.shift();
     res.type('text').send('Marked – opens on the phone with the episode clock');
   });
-  r.post('/mark/remote/take', h(() => ({ marks: remoteMarks.splice(0) })));
+  // The phone tells when it starts or ends an episode.
+  r.post(
+    '/mark/remote/watching',
+    h((req) => {
+      phoneWatchingUntil = req.body?.on ? Date.now() + WATCHING_MS : 0;
+      return { ok: true };
+    }),
+  );
+  r.post(
+    '/mark/remote/take',
+    h(() => {
+      phoneWatchingUntil = Date.now() + WATCHING_MS;
+      return { marks: remoteMarks.splice(0) };
+    }),
+  );
 
   // ---- inbox ----
 

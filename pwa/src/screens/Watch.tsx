@@ -510,6 +510,21 @@ function StartEpisode({ status, onStarted }: { status?: Status; onStarted: () =>
     }
   }
 
+  /** One tap on "Continue": the next episode with the subtitle file Jimaku lists first, no detour over the detail page. */
+  async function continueWatching(s: Recent) {
+    if (!s.jimakuEntryId) return void start({ title: s.title, episode: s.nextEpisode });
+    setBusy(true);
+    setError(undefined);
+    let file: JimakuFile | undefined;
+    try {
+      file = (await jimaku.files(s.jimakuEntryId, s.nextEpisode))[0];
+    } catch (e) {
+      setBusy(false);
+      return setError((e as Error).message);
+    }
+    await start({ title: s.title, entry: { id: s.jimakuEntryId, name: s.title, anilist_id: s.anilistId }, episode: s.nextEpisode, file });
+  }
+
   function choose(e: JimakuEntry, ep?: number) {
     setEntry(e);
     const last = history.find((s) => s.jimakuEntryId === e.id);
@@ -656,11 +671,7 @@ function StartEpisode({ status, onStarted }: { status?: Status; onStarted: () =>
                     key={s.id}
                     className="list-item"
                     disabled={busy}
-                    onClick={() =>
-                      s.jimakuEntryId
-                        ? choose({ id: s.jimakuEntryId, name: s.title, anilist_id: s.anilistId }, s.nextEpisode)
-                        : start({ title: s.title, episode: s.nextEpisode })
-                    }
+                    onClick={() => void continueWatching(s)}
                   >
                     <span className="grow ellipsis">{s.title}</span>
                     <span className="muted">Episode {s.nextEpisode}</span>
@@ -668,6 +679,7 @@ function StartEpisode({ status, onStarted }: { status?: Status; onStarted: () =>
                   </button>
                 ))}
               </div>
+              <p className="footnote">One tap starts the next episode. For a different one, search below.</p>
             </>
           )}
 
