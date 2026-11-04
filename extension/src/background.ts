@@ -117,8 +117,11 @@ async function detectPage(tabId: number): Promise<void> {
 // The next episode is a new address or title in the recorded tab.
 chrome.tabs.onUpdated.addListener((tabId, change) => {
   if (!change.title && !change.url && change.status !== 'complete') return;
-  clearTimeout(detectTimer);
-  detectTimer = setTimeout(() => void detectPage(tabId), 1500);
+  void getState().then((state) => {
+    if (state?.tabId !== tabId) return; // other tabs must not cancel the recorded tab's turn
+    clearTimeout(detectTimer);
+    detectTimer = setTimeout(() => void detectPage(tabId), 1500);
+  });
 });
 
 // ---- reading help (words.ts) ----

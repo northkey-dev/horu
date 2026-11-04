@@ -3,6 +3,7 @@
 //   npm run smoke
 import { spawn } from 'node:child_process';
 import http from 'node:http';
+import os from 'node:os';
 import { zipSync } from 'fflate';
 import { WebSocket } from 'ws';
 import fs from 'node:fs';
@@ -43,13 +44,23 @@ const jimaku = http.createServer((req, res) => {
 });
 await new Promise((r) => jimaku.listen(JIMAKU_PORT, '127.0.0.1', r));
 
+// Anki stand-in: refuses like a closed Anki, or hangs like one that is syncing.
+const ANKI_PORT = 7397;
+let ankiHangs = false;
+const anki = http.createServer((req) => {
+  if (!ankiHangs) req.socket.destroy();
+});
+await new Promise((r) => anki.listen(ANKI_PORT, '127.0.0.1', r));
+
 const server = spawn(process.execPath, [path.join(root, 'server', 'src', 'main.ts')], {
-  env: { ...process.env, HORU_PORT: String(PORT), HORU_DATA: 'data-smoke', HORU_ANKI_URL: 'http://127.0.0.1:9', HORU_JIMAKU_URL: `http://127.0.0.1:${JIMAKU_PORT}` },
+  env: { ...process.env, HORU_PORT: String(PORT), HORU_DATA: 'data-smoke', HORU_ANKI_URL: `http://127.0.0.1:${ANKI_PORT}`, HORU_JIMAKU_URL: `http://127.0.0.1:${JIMAKU_PORT}` },
   stdio: 'ignore',
 });
 const stop = () => {
   server.kill();
   jimaku.close();
+  anki.closeAllConnections();
+  anki.close();
   fs.rmSync(dataDir, { recursive: true, force: true });
 };
 
@@ -191,10 +202,16 @@ try {
     assert.equal(unknown.session.title, 'Totally Unknown Show');
     assert.equal(unknown.session.episode, 3);
     assert.equal(unknown.session.cueCount, 0);
-    const none = (await call('POST', '/api/sessions/detect', { texts: [{ text: "Frieren Beyond Journey's End - SiteName", weight: 2 }] })).json;
-    assert.equal(none.session.episode, 1);
-    assert.equal(none.session.cueCount, 0, 'no episode, no subtitles');
-    assert.match(none.warning ?? '', /no episode/i);
+    // An overview page changes nothing: not the running episode, not the progress behind Continue.
+    await call('POST', '/api/sessions/end');
+    await call('POST', '/api/sessions/detect', { texts: [{ text: "Frieren Beyond Journey's End Episode 9 - SiteName", weight: 2 }] });
+    const overview = (await call('POST', '/api/sessions/detect', { texts: [{ text: "Frieren Beyond Journey's End - SiteName", weight: 2 }] })).json;
+    assert.equal(overview.status, 'none');
+    assert.equal((await call('GET', '/api/status')).json.session.episode, 9);
+    assert.equal((await call('GET', '/api/sessions/recent')).json.find((s) => s.jimakuEntryId === 11).nextEpisode, 10);
+    await call('POST', '/api/sessions/end');
+    assert.equal((await call('POST', '/api/sessions/detect', { texts: [{ text: 'Top 10 Anime Rankings of the Year - Blog', weight: 2 }] })).json.status, 'none');
+    assert.equal((await call('GET', '/api/status')).json.session, undefined);
     assert.equal((await call('POST', '/api/sessions/detect', { texts: [{ text: 'Watch Online Free', weight: 2 }] })).json.status, 'none');
   });
 
@@ -216,6 +233,35 @@ try {
     assert.equal(renamed.session.episode, 9);
     assert.equal(renamed.session.cueCount, 2);
     assert.equal(renamed.session.title, "Frieren: Beyond Journey's End");
+  });
+
+  await check('page recognition: the page you moved on to has the last word', async () => {
+    await call('POST', '/api/sessions/end');
+    const detect = (n) => call('POST', '/api/sessions/detect', { texts: [{ text: `Demon Slayer Episode ${n}`, weight: 2 }] });
+    await Promise.all([detect(3), detect(4)]);
+    assert.equal((await call('GET', '/api/status')).json.session.episode, 4);
+    await call('POST', '/api/sessions/end');
+  });
+
+  await check('status does not wait for a busy Anki', async () => {
+    ankiHangs = true;
+    await new Promise((r) => setTimeout(r, 5200)); // the check after this one runs into the hanging Anki
+    for (let i = 0; i < 3; i++) {
+      const started = Date.now();
+      assert.equal((await call('GET', '/api/status')).status, 200);
+      assert.ok(Date.now() - started < 1000, `status took ${Date.now() - started} ms`);
+    }
+    ankiHangs = false;
+    anki.closeAllConnections();
+  });
+
+  await check('the extension can upload from another computer with the token', async () => {
+    const own = Object.values(os.networkInterfaces()).flat().find((a) => a.family === 'IPv4' && !a.internal);
+    if (!own) return; // no network on this machine
+    const token = fs.readFileSync(path.join(dataDir, 'token.txt'), 'utf8').trim();
+    const upload = (headers) => fetch(`http://${own.address}:${PORT}/api/ext/moments/abc/audio`, { method: 'POST', headers: { 'Content-Type': 'audio/wav', ...headers }, body: 'RIFF' }).then((r) => r.status);
+    assert.equal(await upload({}), 401);
+    assert.equal(await upload({ 'X-Horu-Token': token }), 200);
   });
 
   await check('security: only own server names are answered (DNS rebinding)', async () => {

@@ -29,7 +29,6 @@ import { setRecording } from './remoteStart.ts';
 import { candidatesAt } from '../../shared/subtitles.ts';
 import { importPhoneMoment, markMoment, receiveCapture, refreshCandidates, runWhisper, undoLastMoment } from './moments.ts';
 import { whisperAvailable } from './whisper.ts';
-import { localOnly } from './auth.ts';
 import { log } from './log.ts';
 import * as store from './store.ts';
 import type { CardRequest, Cue, ExtMomentMeta, Moment, Session, Settings, Status } from '../../shared/types.ts';
@@ -39,10 +38,10 @@ const require = createRequire(import.meta.url);
 /** Wall-clock times (ms) of remote marks waiting for the phone's episode clock. */
 const remoteMarks: number[] = [];
 /**
- * Until when the phone says an episode runs on it. A Back Tap outside of watching (a knock in a pocket) must not
- * leave anything behind. Every pick-up of the phone renews it; it ends with the episode or after four hours.
+ * How long the phone's word that an episode runs on it counts. A Back Tap outside of watching (a knock in a pocket)
+ * must not leave anything behind. Every pick-up of the phone renews it; it ends with the episode or after four hours.
+ * It lives in the store, so a laptop restart in the middle of an episode does not refuse the next tap.
  */
-let phoneWatchingUntil = 0;
 const WATCHING_MS = 4 * 3600_000;
 const KUROMOJI_DICT = path.join(path.dirname(require.resolve('kuromoji/package.json')), 'dict');
 
@@ -111,18 +110,26 @@ export function apiRouter(): express.Router {
 
   // ---- status & settings ----
 
-  let ankiCache = { at: 0, ok: false };
+  // The phone asks every few seconds and gives up after five. Anki can take much longer while it syncs, so the
+  // answer never waits for it: it says what the last check found, the next check runs on the side.
+  const anki = { at: 0, ok: false, checking: false };
+  const checkAnki = () => {
+    if (anki.checking || Date.now() - anki.at < 5000) return;
+    anki.checking = true;
+    void ankiOnline().then((ok) => Object.assign(anki, { ok, at: Date.now(), checking: false }));
+  };
+  checkAnki();
   r.get(
     '/status',
-    h(async (): Promise<Status> => {
-      if (Date.now() - ankiCache.at > 5000) ankiCache = { at: Date.now(), ok: await ankiOnline() };
+    h((): Status => {
+      checkAnki();
       const ext = extensionState();
       return {
         version: VERSION,
         cards: cardsHere(),
         extensionConnected: ext.connected,
         extensionRecording: ext.recording,
-        anki: ankiCache.ok ? 'ok' : isAnkiStarting() ? 'starting' : 'offline',
+        anki: anki.ok ? 'ok' : isAnkiStarting() ? 'starting' : 'offline',
         jimakuConfigured: Boolean(getSettings().jimakuApiKey),
         whisperAvailable: whisperAvailable(),
         session: store.activeSession(),
@@ -287,7 +294,7 @@ export function apiRouter(): express.Router {
         // fall through to the phone
       }
     }
-    if (Date.now() > phoneWatchingUntil) {
+    if (Date.now() > store.phoneWatchingUntil()) {
       return void res.status(409).type('text').send('Nothing marked: no episode is running. Start one in Horu, or record the tab in Chrome.');
     }
     remoteMarks.push(at);
@@ -302,14 +309,15 @@ export function apiRouter(): express.Router {
   r.post(
     '/mark/remote/watching',
     h((req) => {
-      phoneWatchingUntil = req.body?.on ? Date.now() + WATCHING_MS : 0;
+      store.setPhoneWatchingUntil(req.body?.on ? Date.now() + WATCHING_MS : 0);
       return { ok: true };
     }),
   );
   r.post(
     '/mark/remote/take',
     h(() => {
-      phoneWatchingUntil = Date.now() + WATCHING_MS;
+      // Asked every 4 s: only touch the file when it matters.
+      if (store.phoneWatchingUntil() < Date.now() + WATCHING_MS - 600_000) store.setPhoneWatchingUntil(Date.now() + WATCHING_MS);
       return { marks: remoteMarks.splice(0) };
     }),
   );
@@ -417,12 +425,11 @@ export function apiRouter(): express.Router {
     h((req) => lookup(Array.isArray(req.body?.forms) ? (req.body.forms as unknown[]).slice(0, 40).map(String) : [])),
   );
 
-  // ---- chrome extension (this machine only) ----
+  // ---- chrome extension ----
 
   const pendingAudio = new Map<string, Buffer>();
   r.post(
     '/ext/moments/:id/audio',
-    localOnly,
     express.raw({ type: () => true, limit: '30mb' }),
     h((req) => {
       pendingAudio.set(param(req, 'id'), req.body as Buffer);
@@ -432,7 +439,6 @@ export function apiRouter(): express.Router {
   );
   r.post(
     '/ext/moments/:id/meta',
-    localOnly,
     h(async (req) => {
       const id = param(req, 'id');
       await receiveCapture(id, req.body as ExtMomentMeta, pendingAudio.get(id));

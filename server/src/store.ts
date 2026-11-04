@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DATA_DIR, MEDIA_DIR, SUBS_DIR, safeId, writeJsonAtomic } from './config.ts';
+import { readJsonKeepingDamaged } from './jsonFile.ts';
 import type { Cue, Moment, Session } from '../../shared/types.ts';
 
 // A tiny JSON-file store. Single user, a few thousand records at most.
@@ -11,17 +12,13 @@ type Db = {
   activeSessionId?: string;
   /** Last episode watched per Jimaku entry, for "next episode" suggestions. */
   lastEpisode: Record<string, number>;
+  /** Until when an episode runs on the phone (see /mark/remote in routes.ts) */
+  phoneWatchingUntil?: number;
 };
 
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 
-const db: Db = (() => {
-  try {
-    return { lastEpisode: {}, ...JSON.parse(fs.readFileSync(DB_FILE, 'utf8')) };
-  } catch {
-    return { moments: [], sessions: [], lastEpisode: {} };
-  }
-})();
+const db: Db = { moments: [], sessions: [], lastEpisode: {}, ...readJsonKeepingDamaged<Partial<Db>>(DB_FILE, () => ({})) };
 
 let saveTimer: NodeJS.Timeout | undefined;
 function save(): void {
@@ -186,6 +183,12 @@ export function sessionCues(id: string): Cue[] {
   } catch {
     return [];
   }
+}
+
+export const phoneWatchingUntil = () => db.phoneWatchingUntil ?? 0;
+export function setPhoneWatchingUntil(at: number): void {
+  db.phoneWatchingUntil = at;
+  save();
 }
 
 export function lastEpisode(entryId: number): number | undefined {

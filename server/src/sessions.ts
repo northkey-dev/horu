@@ -15,8 +15,6 @@ export type StartBody = {
   /** Made by the page recognition */
   auto?: boolean;
   detected?: Session['detected'];
-  /** Do not load Jimaku subtitles (the episode is not known) */
-  noSubtitles?: boolean;
 };
 
 /** Starts an episode: loads the Jimaku subtitles (the first file unless one is given) and makes it the running one. */
@@ -25,7 +23,7 @@ export async function startSessionFor(body: StartBody): Promise<{ session: Sessi
   let cues: Cue[] = [];
   let subtitleName: string | undefined;
   let warning: string | undefined;
-  if (body.jimakuEntryId && !body.noSubtitles) {
+  if (body.jimakuEntryId) {
     try {
       const file = body.fileUrl ? { url: body.fileUrl, name: body.fileName ?? 'subs.srt', size: 0 } : (await listFiles(body.jimakuEntryId, body.episode))[0];
       if (file) {
@@ -84,26 +82,29 @@ async function findEntry(titles: string[], season?: number): Promise<EntryMatch 
 }
 
 const shownTitle = (e: EntryMatch['entry']) => e.english_name || e.name;
-let running: Promise<Detection> | undefined;
+let last: Promise<unknown> = Promise.resolve();
 
 /**
  * The texts of the recorded page name a show and an episode: start that episode, unless one was chosen by hand.
  * A recognised episode is replaced when the page moves on (next episode); the page's own subtitle lines stay.
+ * One after the other, so the page you moved on to has the last word.
  */
 export function detectFromPage(texts: PageText[]): Promise<Detection> {
-  running ??= detect(texts).finally(() => (running = undefined));
-  return running;
+  const run = last.then(() => detect(texts));
+  last = run.catch(() => undefined);
+  return run;
 }
 
 async function detect(texts: PageText[]): Promise<Detection> {
   const guess = bestGuess(texts);
-  if (!guess) return { status: 'none' };
+  // No episode number: an overview page, a film or no anime at all. Nothing to start and nothing to replace.
+  if (guess?.episode === undefined) return { status: 'none' };
+  const { episode } = guess;
   const active = store.activeSession();
   if (active && !active.auto) return { status: 'manual', session: active };
 
   const entry = await findEntry(guess.titles, guess.season);
   const title = entry ? shownTitle(entry.entry) : guess.titles[0];
-  const episode = guess.episode ?? 1;
   const detected: Session['detected'] = entry ? (entry.confident ? 'matched' : 'unsure') : 'guess';
 
   if (active) {
@@ -123,7 +124,6 @@ async function detect(texts: PageText[]): Promise<Detection> {
     episode,
     auto: true,
     detected,
-    noSubtitles: guess.episode === undefined,
   });
-  return { status: 'started', session, warning: guess.episode === undefined ? 'The page names no episode number, so no subtitles were loaded.' : warning };
+  return { status: 'started', session, warning };
 }

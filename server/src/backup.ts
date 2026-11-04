@@ -9,7 +9,7 @@ import { flush } from './store.ts';
 // Daily copy of everything Horu cannot rebuild: moments and sessions, settings, known words, vocabulary and
 // Anki history, push keys. Media, dictionaries and manga are large and can be fetched again, so they stay out.
 
-const FILES = ['db.json', 'settings.json', 'known.json', 'vocab-history.json', 'analytics-anki.json', 'manga.json', 'push.json', 'token.txt'];
+const FILES = ['db.json', 'settings.json', 'known.json', 'vocab-history.json', 'analytics-anki.json', 'manga.json', 'push.json', 'token.txt', 'reading.json', 'prepared.json', 'kanji-cards.json'];
 const SUBFOLDERS = ['subs'];
 // The extra folder is usually synced to a cloud, so it gets no secrets: no access token, no push keys, no API key.
 const SECRET_FILES = new Set(['token.txt', 'push.json']);

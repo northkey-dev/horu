@@ -120,6 +120,12 @@ try {
   check('recognised episode 7', s?.episode === 7, JSON.stringify(s));
   check('matched on Jimaku with subtitles', s?.detected === 'matched' && s?.cueCount === 2, JSON.stringify(s));
 
+  // A chat or news tab in the background keeps changing its title: it must not hold up the recorded tab.
+  const noisy = await browser.newPage();
+  await noisy.goto(`http://127.0.0.1:${SITE}/watch/frieren-beyond-journeys-end-episode-8`, { waitUntil: 'load' });
+  await noisy.evaluate(() => setInterval(() => (document.title = `(${Date.now()}) news`), 300));
+  await tab.bringToFront();
+
   // Next episode on a differently written title: the session follows.
   await tab.click('#next');
   let next;

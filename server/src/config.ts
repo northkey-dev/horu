@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Settings } from '../../shared/types.ts';
 import { DEFAULT_PROFILE } from '../../shared/ai.ts';
+import { readJsonKeepingDamaged } from './jsonFile.ts';
 
 export const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 // Optional settings in .env next to package.json. Values already in the environment win.
@@ -80,12 +81,7 @@ const DEFAULT_SETTINGS: Settings = {
   hookUrl: 'ws://127.0.0.1:6677',
 };
 
-let settings: Settings = { ...DEFAULT_SETTINGS };
-try {
-  settings = { ...DEFAULT_SETTINGS, ...JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')) };
-} catch {
-  // first run
-}
+let settings: Settings = { ...DEFAULT_SETTINGS, ...readJsonKeepingDamaged<Partial<Settings>>(SETTINGS_FILE, () => ({})) };
 
 export function getSettings(): Settings {
   return settings;

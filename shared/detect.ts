@@ -97,12 +97,20 @@ export function parsePageText(raw: string): Guess | undefined {
   return { titles, episode: marker?.episode, season: season ?? marker?.season };
 }
 
+const decoded = (s: string) => {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s; // a stray % in the address
+  }
+};
+
 /** The address' path as readable text: "/watch/berserk-1997-episode-3/" → "berserk 1997 episode 3". Ids and hashes drop out. */
 export function textFromPath(pathname: string): string {
   return pathname
     .split('/')
     .flatMap((seg) => {
-      let s = decodeURIComponent(seg).replace(/\.[a-z0-9]{2,5}$/i, '');
+      let s = decoded(seg).replace(/\.[a-z0-9]{2,5}$/i, '');
       if (!/[a-z぀-鿿]{2}/i.test(s) && !/^(?:s\d+e\d+|e\d+|ep\d+)$/i.test(s)) return [];
       s = s.replace(/[-_+]+/g, ' ');
       return s

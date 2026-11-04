@@ -59,6 +59,10 @@ test('the address becomes readable text', () => {
   assert.equal(textFromPath('/stream/s1e4/berserk'), 'stream / s1e4 / berserk');
 });
 
+test('a stray % in the address does not stop the reading', () => {
+  assert.equal(textFromPath('/watch/100%-show/episode-3'), 'watch / 100% show / episode 3');
+});
+
 test('texts vote: the show appears in most, the site in one', () => {
   const g = bestGuess([
     { text: 'AniSite - Berserk Episode 3', weight: 2 },

@@ -96,11 +96,6 @@ export function crossOrigin(req: Request, res: Response, next: NextFunction): vo
   next();
 }
 
-export function localOnly(req: Request, res: Response, next: NextFunction): void {
-  if (isLoopback(req)) return next();
-  res.status(403).end();
-}
-
 /** This computer, or anyone with the access token (Horu in a container: its own address is not loopback). */
 export function localOrToken(req: Request, res: Response, next: NextFunction): void {
   if (isLoopback(req) || hasToken(req)) return next();

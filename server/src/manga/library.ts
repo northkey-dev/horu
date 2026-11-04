@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DATA_DIR, MANGA_DIR, safeId, writeJsonAtomic } from '../config.ts';
+import { readJsonKeepingDamaged } from '../jsonFile.ts';
 
 // Horu's own manga state: which manga are being read, reading progress and the
 // chapters prepared (downloaded + OCR'd) for offline reading on the phone.
@@ -52,13 +53,7 @@ const FILE = path.join(DATA_DIR, 'manga.json');
 export const THUMB_DIR = path.join(MANGA_DIR, 'thumbs');
 fs.mkdirSync(THUMB_DIR, { recursive: true });
 
-const db: Db = (() => {
-  try {
-    return JSON.parse(fs.readFileSync(FILE, 'utf8'));
-  } catch {
-    return { manga: [], chapters: [] };
-  }
-})();
+const db = readJsonKeepingDamaged<Db>(FILE, () => ({ manga: [], chapters: [] }));
 
 let timer: NodeJS.Timeout | undefined;
 function save(): void {

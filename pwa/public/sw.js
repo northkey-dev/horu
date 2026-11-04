@@ -31,13 +31,17 @@ async function cacheFirst(cacheName, request) {
 }
 
 // A switched-off laptop behind Tailscale does not refuse the connection, it just never answers.
-// So the network only gets a few seconds before the cached shell is used.
+// So the network only gets a few seconds to start answering before the cached shell is used. The limit ends with
+// the first answer: a slow line may take as long as it needs for the rest.
 const NETWORK_WAIT = 3000;
 
 async function networkFirst(request) {
   const cache = await caches.open(SHELL);
+  const stop = new AbortController();
+  const limit = setTimeout(() => stop.abort(), NETWORK_WAIT);
   try {
-    const res = await fetch(request, { signal: AbortSignal.timeout(NETWORK_WAIT) });
+    const res = await fetch(request, { signal: stop.signal });
+    clearTimeout(limit);
     if (res.ok) cache.put(request.mode === 'navigate' ? BASE : request, res.clone());
     return res;
   } catch {
@@ -82,7 +86,7 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== location.origin) return;
   if (url.pathname.startsWith('/api/')) return; // live data, handled by the app
   if (url.pathname.startsWith(BASE + 'dict/kuromoji/')) return event.respondWith(cacheFirst(KUROMOJI, event.request));
-  if (url.pathname.startsWith('/dict/')) return; // jmdict: cached by the app with versioning
+  if (url.pathname.startsWith(BASE + 'dict/')) return; // jmdict and kanjidic: cached by the app with versioning
   if (url.pathname.startsWith(BASE + 'assets/')) return event.respondWith(cacheFirst(SHELL, event.request));
   event.respondWith(networkFirst(event.request));
 });
