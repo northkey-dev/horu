@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Horu – extension options</title>
+<style>
+  body { font: 15px/1.5 system-ui, sans-serif; max-width: 560px; margin: 40px auto; padding: 0 20px; color: #1d1d1f; }
+  @media (prefers-color-scheme: dark) { body { background: #151311; color: #ece6dc; } input { background: #26221e; color: inherit; border-color: #4a443c; } }
+  h1 { font-size: 22px; }
+  label { display: block; margin: 18px 0 4px; font-weight: 600; }
+  input { width: 100%; box-sizing: border-box; padding: 8px 10px; font: inherit; border: 1px solid #c9c4bb; border-radius: 6px; }
+  .hint { color: #8a8378; font-size: 13px; margin-top: 4px; }
+  button { margin: 18px 8px 0 0; padding: 8px 16px; font: inherit; border-radius: 6px; border: 1px solid #c9c4bb; background: transparent; color: inherit; cursor: pointer; }
+  button.primary { background: #d9480f; border-color: #d9480f; color: #fff; }
+  #result { margin-top: 16px; min-height: 22px; }
+  .ok { color: #2b8a3e; } .bad { color: #e03131; }
+</style>
+</head>
+<body>
+<h1>Horu extension</h1>
+<p>Where does Horu run? Leave empty if it runs on this computer.</p>
+<label for="server">Server address</label>
+<input id="server" placeholder="http://127.0.0.1:7317" autocomplete="off" spellcheck="false">
+<div class="hint">Horu on a Raspberry Pi or another computer: its Tailscale address, e.g. <code>https://horu.your-tailnet.ts.net</code>.</div>
+<label for="token">Access token (only without Tailscale)</label>
+<input id="token" placeholder="empty" autocomplete="off" spellcheck="false">
+<div class="hint">Needed when Horu is reached over the home network by its plain address. It is in <code>data/token.txt</code> of Horu.</div>
+<button class="primary" id="save">Save</button><button id="test">Test connection</button>
+<div id="result"></div>
+<script src="options.js" type="module"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+faster-whisper>=1.1
+mokuro>=0.2.5
+# Photos (Read -> Camera): easyocr==1.7.2 is installed by the installer with --no-deps, these are its other needs
+python-bidi
+pyyaml
+scikit-image

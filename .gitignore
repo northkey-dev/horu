@@ -1,0 +1,17 @@
+node_modules/
+dist/
+data/
+tools/.venv/
+tools/launcher/*.exe
+*.log
+
+tools/suwayomi/
+data-e2e/
+
+data-smoke/
+.pages/
+.env
+
+# trailer and private test notes: stay on this computer
+trailer/
+docs/TESTPLAN.md

@@ -1,0 +1,63 @@
+{
+  "manifest_version": 3,
+  "name": "Horu",
+  "description": "Mine Japanese from anime without pausing, and see which words you do not know yet on any page.",
+  "version": "0.4.0",
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "action": {
+    "default_title": "Horu: start recording this tab"
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": [
+    "tabCapture",
+    "offscreen",
+    "storage",
+    "tabs",
+    "activeTab",
+    "contextMenus",
+    "webRequest"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js",
+        "words.js"
+      ],
+      "all_frames": true,
+      "match_about_blank": true,
+      "run_at": "document_idle"
+    }
+  ],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAr4aN1PhW9Klr0hPGz6BCykrSNlPAP+CQjfgK78f7h8PL5oBipHWnjCDEn80AnV28X1+Hgf4/2aL3n2NZm/2ZnqNLXvvu7PdK1S39U8N7Zu47g7DHKBqppNT932y+4ZGE+1IgW52ol5jdednVSY2H2oncn1vFRdWgUOJLFuHnF3uhfEXndjCRwodmffiQKuwKhBcM7qMiQ67zBcRRZNqsDgBX0I5ALM6yDKxuQes8HjrSp177ze0kRrTcmGK4GRx0Cb1c27aa3JUNuMrBYmq4RUKJlV5n6HQg4ZSWjTQFEw4Hk696zgxIstLEjghJnnaj0KJ1vw13M1cwu/nIVpEnxwIDAQAB",
+  "commands": {
+    "toggle-recording": {
+      "suggested_key": {
+        "default": "Alt+Shift+H"
+      },
+      "description": "Start/stop recording this tab"
+    },
+    "toggle-highlight": {
+      "suggested_key": {
+        "default": "Alt+Shift+J"
+      },
+      "description": "Highlight unknown Japanese words on this site"
+    }
+  }
+}

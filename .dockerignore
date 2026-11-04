@@ -1,0 +1,17 @@
+.git
+.env
+.github
+.pages
+node_modules
+**/node_modules
+data
+data-*
+tools/.venv
+tools/suwayomi
+tools/launcher
+pwa/dist
+extension/dist
+*.log
+docs
+tests
+.env

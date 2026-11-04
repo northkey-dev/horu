@@ -1,0 +1,43 @@
+# Publishes the phone app of this fork to GitHub Pages: https://<owner>.github.io/<repo>/
+# Once: Settings -> Pages -> Source -> GitHub Actions. Then Actions -> Publish app -> Run workflow.
+name: Publish app
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Dictionaries that ship with the app
+        run: node scripts/build-dicts.ts
+      - run: npm run build -w pwa
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: pwa/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

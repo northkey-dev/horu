@@ -1,0 +1,23 @@
+# Horu without Tailscale: only on the home network, over plain http. The phone app can then not use the
+# microphone, offline mode or reminders (browsers allow those only on https), and the Chrome extension needs the
+# access token. Use docker-compose.yml (Tailscale) if you can.
+name: horu
+
+services:
+  horu:
+    image: ghcr.io/northkey-dev/horu:${HORU_VERSION:-latest}
+    build:
+      context: .
+      args:
+        MODULES: ${HORU_MODULES:-manga}
+    ports:
+      - "${HORU_PORT:-7317}:7317"
+    user: "${PUID:-1000}:${PGID:-1000}"
+    environment:
+      TZ: ${TZ:-Europe/Berlin}
+      HORU_LAN_ADDRESS: ${HORU_LAN_ADDRESS:-}
+      HORU_ANKI_URL: ${HORU_ANKI_URL:-}
+      HORU_APP_URL: ${HORU_APP_URL:-}
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
