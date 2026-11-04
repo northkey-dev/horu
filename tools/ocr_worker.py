@@ -115,6 +115,122 @@ ocr.split_into_chunks = split_noting_direction
 ocr.mocr = read_line
 
 
+# ---- reading the furigana itself ----
+# The reading the page prints beats every dictionary. In a vertical block furigana are small marks to the right of
+# a column, and the column is measured on the picture (the detector's font size can be twice the real one). What is
+# read here is only a candidate: the server keeps it if it really is a reading of that kanji (shared/readings.ts).
+
+KANJI_RUN = re.compile(r"[㐀-鿿々]+")
+
+
+def runs_of(on):
+    """Runs of True, as (start, end)."""
+    out = []
+    start = None
+    for i, value in enumerate(on):
+        if value and start is None:
+            start = i
+        elif not value and start is not None:
+            out.append((start, i))
+            start = None
+    if start is not None:
+        out.append((start, len(on)))
+    return out
+
+
+def columns_of(block, clean, left, top):
+    """Where the text of each line really is: the band with the most ink inside its box."""
+    columns = []
+    for text, quad in zip(block["lines"], block["lines_coords"]):
+        xs = [p[0] for p in quad]
+        ys = [p[1] for p in quad]
+        x1, x2 = max(0, int(min(xs)) - left), int(max(xs)) - left
+        y1, y2 = max(0, int(min(ys)) - top), int(max(ys)) - top
+        part = clean[y1:y2, x1:x2]
+        if part.size == 0:
+            continue
+        ink_per_column = part.sum(axis=0)
+        bands = runs_of(ink_per_column > 0)
+        if not bands:
+            continue
+        s, e = max(bands, key=lambda band: ink_per_column[band[0] : band[1]].sum())
+        rows = runs_of(clean[y1:y2, x1 + s : x1 + e].sum(axis=1) > 0)
+        if rows:
+            columns.append({"text": text, "left": x1 + s + left, "right": x1 + e + left, "top": rows[0][0] + y1 + top, "bottom": rows[-1][1] + y1 + top})
+    return sorted(columns, key=lambda c: c["left"])
+
+
+def groups_of(marks, gap):
+    """Marks above each other that belong together, as boxes."""
+    groups = []
+    for m in sorted(marks, key=lambda m: m[1]):
+        if groups and m[1] - groups[-1][3] < gap:
+            g = groups[-1]
+            g[0], g[1], g[2], g[3] = min(g[0], m[0]), min(g[1], m[1]), max(g[2], m[2]), max(g[3], m[3])
+        else:
+            groups.append(list(m))
+    return groups
+
+
+def furigana_of(image, gray, block):
+    """Pairs of kanji and the marks beside them in a vertical block."""
+    font = int(block.get("font_size") or 30)
+    x1, y1, x2, y2 = [int(v) for v in block["box"]]
+    left, right = max(0, x1 - font), min(gray.shape[1], x2 + font)
+    top, bottom = max(0, y1 - 8), min(gray.shape[0], y2 + 8)
+    region = gray[top:bottom, left:right]
+    _, binary = cv2.threshold(region, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    ink = (binary == 0).astype(np.uint8)
+    if ink.mean() > 0.5:  # a dark background
+        return []
+    count, labels, stats, _ = cv2.connectedComponentsWithStats(ink, connectivity=8)
+    keep = np.zeros(count, dtype=bool)
+    marks = []
+    for i in range(1, count):
+        x, y, w, h, area = stats[i]
+        if area >= 3 and max(w, h) <= font * 2:  # not specks, not the bubble's outline
+            keep[i] = True
+            marks.append((x + left, y + top, x + w + left, y + h + top))
+    columns = columns_of(block, keep[labels], left, top)
+    found = []
+    for i, column in enumerate(columns):
+        width = column["right"] - column["left"]
+        limit = columns[i + 1]["left"] if i + 1 < len(columns) else column["right"] + width
+        beside = [
+            m
+            for m in marks
+            if column["right"] <= (m[0] + m[2]) / 2 < limit
+            and max(m[2] - m[0], m[3] - m[1]) < width * 0.8
+            and column["top"] - 4 <= (m[1] + m[3]) / 2 <= column["bottom"] + 4
+        ]
+        spans = list(KANJI_RUN.finditer(column["text"]))
+        if not beside or not spans:
+            continue
+        cell = (column["bottom"] - column["top"]) / max(1, len(column["text"]))
+        parts = {}
+        for g in groups_of(beside, width * 0.45):
+            if g[3] - g[1] < width * 0.25:
+                continue
+            crop = image.crop((g[0] - 3, g[1] - 3, g[2] + 3, g[3] + 3))
+            text = mocr(crop.resize((crop.width * 4, crop.height * 4), Image.LANCZOS).convert("RGB"))
+            at = ((g[1] + g[3]) / 2 - column["top"]) / cell
+            run = min(spans, key=lambda m: 0 if m.start() <= at <= m.end() else min(abs(at - m.start()), abs(at - m.end())))
+            parts.setdefault((run.start(), run.group()), []).append(text)
+        found += [{"base": base, "ruby": "".join(texts)} for (_, base), texts in sorted(parts.items())]
+    return found
+
+
+def page_furigana(file, blocks):
+    """The candidates of each block; a page that cannot be read this way simply has none."""
+    try:
+        with Image.open(file) as im:
+            image = im.convert("L")
+        gray = np.array(image)
+        return [furigana_of(image, gray, b) if b.get("vertical") else [] for b in blocks]
+    except Exception:  # noqa: BLE001 - the text itself is fine without this
+        return [[] for _ in blocks]
+
+
 def shrink(file):
     """Re-encodes a JPEG at quality 80 when that saves at least a quarter (same size in pixels, so the
     text boxes still fit). Colour scans often halve; black and white pages rarely change."""
@@ -209,13 +325,15 @@ for line in sys.stdin:
                 print(json.dumps({"id": req["id"], "page": photo}, ensure_ascii=False), flush=True)
                 continue
         page = ocr(req["file"])
+        furigana = page_furigana(req["file"], page.get("blocks", []))
         blocks = [
             {
                 "box": [int(v) for v in b["box"]],
                 "vertical": bool(b.get("vertical", False)),
                 "lines": b.get("lines", []),
+                "furigana": found,
             }
-            for b in page.get("blocks", [])
+            for b, found in zip(page.get("blocks", []), furigana)
         ]
         out = {"img_width": page["img_width"], "img_height": page["img_height"], "blocks": blocks}
         if req.get("shrink"):

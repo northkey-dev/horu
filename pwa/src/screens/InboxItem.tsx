@@ -314,6 +314,7 @@ function Editor({ moment, refresh }: { moment: Moment; refresh: () => void }) {
             <div className="card">
               <TokenText
                 text={sentence}
+                printed={moment.readings}
                 target={target}
                 suggested={suggested}
                 onTokens={setTokens}

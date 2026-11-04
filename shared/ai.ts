@@ -1,3 +1,4 @@
+import type { Printed } from './readings.ts';
 // Card explanations: the prompt and the AI services that answer it. Runs on the laptop (server) and on the
 // phone (PWA) alike, so it only uses fetch. `claude -p` lives in server/src/claude.ts because it needs a shell.
 
@@ -8,7 +9,7 @@ export type Explanation = {
   explanation: string;
 };
 
-export type ExplainInput = { sentence: string; target: string; context: string[]; source: string };
+export type ExplainInput = { sentence: string; target: string; context: string[]; source: string; readings?: Printed[] };
 
 /** Services that are called over HTTP with the user's own key (Ollama needs none). */
 export type AiService = 'gemini' | 'anthropic' | 'openai' | 'ollama';
@@ -52,6 +53,7 @@ export function buildPrompt(input: ExplainInput, profile = DEFAULT_PROFILE): str
     `Source: ${input.source}`,
     input.context.length ? `Surrounding lines:\n${input.context.map((l) => `  ${l}`).join('\n')}` : '',
     `Sentence: ${input.sentence}`,
+    printedLine(input.readings),
     `Target word: ${input.target}`,
     '',
     'Return JSON with:',
@@ -75,17 +77,32 @@ export function chatPrompt(input: ExplainInput, profile?: string): string {
 }
 
 /** Translation of a whole line, e.g. a manga speech bubble. */
-export type Translation = { translation: string; notes: string };
+export type WordNote = { word: string; reading: string; meaning: string };
+export type Translation = { translation: string; notes: string; words?: WordNote[] };
 
-export type TranslateInput = { text: string; context: string[]; source: string };
+export type TranslateInput = { text: string; context: string[]; source: string; readings?: Printed[]; wordByWord?: boolean };
+
+/** What the page prints beats what a model remembers: 間 here is あいだ, whatever else it can be. */
+const printedLine = (readings: Printed[] = []) =>
+  readings.length ? `Furigana printed on the page: ${readings.map((r) => `${r.base}=${r.reading}`).join(', ')}. These are how the author wants it read: use exactly these readings everywhere in your answer and never say that one of them is read differently.` : '';
 
 export const TRANSLATE_SCHEMA = {
   type: 'object',
   properties: {
     translation: { type: 'string', description: 'Natural English translation of the text' },
     notes: { type: 'string', description: 'At most two short sentences for the learner, or an empty string' },
+    words: {
+      type: 'array',
+      description: 'The words of the text one by one, or an empty list',
+      items: {
+        type: 'object',
+        properties: { word: { type: 'string' }, reading: { type: 'string' }, meaning: { type: 'string' } },
+        required: ['word', 'reading', 'meaning'],
+        additionalProperties: false,
+      },
+    },
   },
-  required: ['translation', 'notes'],
+  required: ['translation', 'notes', 'words'],
   additionalProperties: false,
 };
 
@@ -97,12 +114,16 @@ export function translatePrompt(input: TranslateInput, profile = DEFAULT_PROFILE
     `Source: ${input.source}`,
     input.context.length ? `Lines before it:\n${input.context.map((l) => `  ${l}`).join('\n')}` : '',
     `Text: ${input.text}`,
+    printedLine(input.readings),
     '',
     'The text may come from OCR of a manga page and contain small recognition errors; translate what was most likely meant.',
     'Return JSON with:',
     '- translation: natural English translation of the text (keep the tone; use the lines before it only as context)',
     '- notes: at most two short English sentences on what this learner would miss (casual or contracted forms,',
     '  grammar, nuance, an OCR error you corrected). Empty string if there is nothing worth saying.',
+    input.wordByWord
+      ? '- words: every word of the text that carries meaning, in order, without particles. For each: word (as written), reading (hiragana), meaning (short English; for an inflected word also its dictionary form and what the form does, e.g. "sold: past of 売る, to sell").'
+      : '- words: an empty list',
     '',
     'Write in complete, well-formed English sentences regardless of any other style preferences.',
   ]
@@ -116,7 +137,8 @@ export function parseTranslation(text: string): Translation | undefined {
   try {
     const data = JSON.parse(match[0]) as Partial<Translation>;
     if (typeof data.translation !== 'string' || !data.translation.trim()) return undefined;
-    return { translation: data.translation, notes: String(data.notes ?? '') };
+    const words = Array.isArray(data.words) ? data.words.filter((w) => typeof w?.word === 'string' && typeof w?.meaning === 'string').map((w) => ({ word: w.word, reading: String(w.reading ?? ''), meaning: w.meaning })) : [];
+    return { translation: data.translation, notes: String(data.notes ?? ''), words };
   } catch {
     return undefined;
   }
@@ -204,7 +226,7 @@ async function ask(config: AiConfig, prompt: string, schema: object): Promise<{ 
           // The phone calls the API directly with the user's own key.
           'anthropic-dangerous-direct-browser-access': 'true',
         },
-        body: JSON.stringify({ model, max_tokens: 800, messages: [{ role: 'user', content: `${prompt}\n\nAnswer with only the JSON object.` }] }),
+        body: JSON.stringify({ model, max_tokens: 1500, messages: [{ role: 'user', content: `${prompt}\n\nAnswer with only the JSON object.` }] }),
       },
       label,
     )) as { content?: { type: string; text?: string }[] };

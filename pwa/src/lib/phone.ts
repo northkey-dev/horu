@@ -65,6 +65,9 @@ export const setQuickContinue = (on: boolean) => write('horu-quick-continue', on
 /** A line opened in the reader starts translating right away, so Translate has its answer ready. */
 export const translatesAhead = () => read<boolean>('horu-translate-ahead', true);
 export const setTranslatesAhead = (on: boolean) => write('horu-translate-ahead', on);
+/** A translation also goes through the line word by word. */
+export const wordByWord = () => read<boolean>('horu-word-by-word', true);
+export const setWordByWord = (on: boolean) => write('horu-word-by-word', on);
 export const anilistToken = () => read<string>('horu-anilist', '');
 export const setAnilistToken = (token: string) => write('horu-anilist', token.trim());
 

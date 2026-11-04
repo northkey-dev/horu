@@ -8,7 +8,7 @@ import { downsample, toWav } from './mic.ts';
 import { recall, remember, mirroredMedia } from './mirror.ts';
 import { api, laptopUp } from './api.ts';
 import { laptopUrl } from './laptop.ts';
-import { translatesAhead } from './phone.ts';
+import { translatesAhead, wordByWord } from './phone.ts';
 
 // Cards made on the phone. The laptop stays the default when it is reachable (its Anki, its AI); without it
 // the phone builds the card itself and sends it to one of these:
@@ -87,6 +87,7 @@ export function explainInput(moment: Moment, req: CardRequest): ExplainInput {
     target: req.targetDictForm && req.targetDictForm !== target ? `${target} (${req.targetDictForm})` : target,
     context: req.context,
     source: moment.sourceLabel,
+    readings: moment.readings,
   };
 }
 
@@ -102,10 +103,12 @@ export async function explainOnPhone(service: KeyService, moment: Moment, req: C
  * Settings, else the laptop's AI when it is reachable, else the first key on the phone. Without any, the
  * prompt is copied for a chat app and 'copied' comes back.
  */
-export async function translateLine(input: TranslateInput): Promise<Translation | 'copied'> {
+export async function translateLine(line: TranslateInput): Promise<Translation | 'copied'> {
   const p = cardPrefs();
-  const cache = `horu-tr:${input.text}`;
-  const running = translating.get(input.text);
+  const input = { ...line, wordByWord: wordByWord() };
+  const key = `${input.wordByWord ? 'w' : ''}${input.text}`;
+  const cache = `horu-tr:${key}`;
+  const running = translating.get(key);
   if (running) return running;
   try {
     const hit = sessionStorage.getItem(cache);
@@ -127,8 +130,8 @@ export async function translateLine(input: TranslateInput): Promise<Translation 
       }
       return result;
     })
-    .finally(() => translating.delete(input.text));
-  translating.set(input.text, run);
+    .finally(() => translating.delete(key));
+  translating.set(key, run);
   return run;
 }
 
@@ -184,14 +187,14 @@ async function cutClip(blob: Blob, from: number, to: number): Promise<Blob> {
 }
 
 /** A computer voice from the laptop for a card without sound; a card without it is fine too. */
-async function laptopVoice(text: string): Promise<Blob | undefined> {
+async function laptopVoice(text: string, readings: Moment['readings']): Promise<Blob | undefined> {
   if (!laptopUp()) return undefined;
   try {
     const res = await fetch(laptopUrl('/api/tts'), {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, readings }),
       signal: AbortSignal.timeout(20_000),
     });
     return res.ok ? await res.blob() : undefined;
@@ -204,7 +207,7 @@ async function build(moment: Moment, req: CardRequest, ai: Explanation | undefin
   const sentence = req.sentence.trim();
   const target = sentence.slice(req.targetStart, req.targetEnd);
   const word = req.targetDictForm || target;
-  const { furigana, reading } = await cardText(sentence, req.targetStart, req.targetEnd, word);
+  const { furigana, reading } = await cardText(sentence, req.targetStart, req.targetEnd, word, moment.readings);
   const files: Media[] = [];
   let audio = '';
   let image = '';
@@ -218,7 +221,7 @@ async function build(moment: Moment, req: CardRequest, ai: Explanation | undefin
     files.push({ name, data: new Uint8Array(await clip.arrayBuffer()) });
     audio = `[sound:${name}]`;
   } else {
-    const voice = await laptopVoice(sentence);
+    const voice = await laptopVoice(sentence, moment.readings);
     if (voice) {
       const name = `horu_${moment.id}.mp3`;
       files.push({ name, data: new Uint8Array(await voice.arrayBuffer()) });

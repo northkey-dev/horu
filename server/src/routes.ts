@@ -27,6 +27,7 @@ import { cuesFromUpload, listFiles, searchEntries } from './jimaku.ts';
 import { detectFromPage, startSessionFor, type StartBody } from './sessions.ts';
 import { setRecording } from './remoteStart.ts';
 import { speak, ttsInstalled, ttsOn } from './tts.ts';
+import { asPrinted } from '../../shared/readings.ts';
 import { candidatesAt } from '../../shared/subtitles.ts';
 import { importPhoneMoment, markMoment, receiveCapture, refreshCandidates, runWhisper, undoLastMoment } from './moments.ts';
 import { whisperAvailable } from './whisper.ts';
@@ -97,7 +98,7 @@ export function apiRouter(): express.Router {
       const text = String(req.body?.text ?? '').trim().slice(0, 1000);
       if (!text) throw new Error('Nothing to translate');
       const context = Array.isArray(req.body?.context) ? (req.body.context as unknown[]).slice(-4).map((l) => String(l).slice(0, 300)) : [];
-      return translateOnLaptop({ text, context, source: String(req.body?.source ?? '').slice(0, 200) });
+      return translateOnLaptop({ text, context, source: String(req.body?.source ?? '').slice(0, 200), readings: asPrinted(req.body?.readings), wordByWord: req.body?.wordByWord === true });
     }),
   );
   r.post(
@@ -329,7 +330,7 @@ export function apiRouter(): express.Router {
     if (!text || !ttsOn()) return void res.status(404).end();
     const mp3 = store.mediaPath(store.newId(), 'mp3');
     try {
-      await speak(text, mp3);
+      await speak(text, mp3, asPrinted(req.body?.readings));
       res.type('audio/mpeg').sendFile(mp3, () => store.removeFile(mp3));
     } catch (err) {
       res.status(400).json({ error: (err as Error).message });

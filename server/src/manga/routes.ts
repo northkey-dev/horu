@@ -12,6 +12,7 @@ import { enqueue, ocrAvailable, pauseManga, rereadChapter, resumeChapter, schedu
 import { importArchive } from './importer.ts';
 import { cropAround } from '../crop.ts';
 import { downloadBook, searchServer, serverBooks, serverName } from './servers.ts';
+import { asPrinted } from '../../../shared/readings.ts';
 
 export { start as startMangaWorker };
 
@@ -340,7 +341,7 @@ export function mangaRouter(): express.Router {
   r.post(
     '/mine',
     h(async (req) => {
-      const { mangaKey, chapterKey, page, block, text, at, targetHint } = req.body as {
+      const { mangaKey, chapterKey, page, block, text, at, targetHint, readings } = req.body as {
         mangaKey: string;
         chapterKey: string;
         page: number;
@@ -349,6 +350,8 @@ export function mangaRouter(): express.Router {
         at?: string;
         /** The word tapped in the reader: the inbox preselects it */
         targetHint?: string;
+        /** Furigana the page prints for this text */
+        readings?: unknown;
       };
       if (!text?.trim()) throw new Error('No text');
       const manga = lib.getManga(mangaKey);
@@ -376,6 +379,7 @@ export function mangaRouter(): express.Router {
         hasImage,
         candidates: [{ start: 0, end: 0, text: text.trim(), source: 'ocr' }],
         targetHint: targetHint?.trim() || undefined,
+        readings: asPrinted(readings),
       });
     }),
   );

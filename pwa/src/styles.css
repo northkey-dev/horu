@@ -454,6 +454,11 @@ img.cover { box-shadow: 0 0 0 var(--hair) var(--line-strong); }
 .reader-sheet .translation { margin-top: 12px; padding-top: 10px; border-top: var(--hair) solid var(--line); }
 .reader-sheet .translation p { margin: 0 0 6px; font-size: 16px; line-height: 23px; }
 .reader-sheet .translation p.hint { font-size: 13px; line-height: 18px; }
+.word-list { margin: 8px 0 0; }
+.word-list > div { padding: 5px 0; border-top: var(--hair) solid var(--line); }
+.word-list dt { font-size: 15px; line-height: 21px; }
+.word-list dt .muted { font-size: 12px; }
+.word-list dd { margin: 0; font-size: 13px; line-height: 18px; color: var(--text-2); }
 .reader-note { position: absolute; left: 12px; right: 12px; top: calc(env(safe-area-inset-top) + 64px); z-index: 3; padding: 10px 12px; border-radius: 8px; font-size: 13.5px; line-height: 19px; background: rgba(228, 96, 74, 0.92); color: #fff; }
 .page-count { font-variant-numeric: tabular-nums; font-weight: 500; }
 

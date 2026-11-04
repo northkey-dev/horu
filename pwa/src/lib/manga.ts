@@ -2,6 +2,7 @@
 // prepared chapters can be read without the laptop.
 
 import type { EpisodeInsight } from './api.ts';
+import type { Printed } from '../../../shared/readings.ts';
 import { laptopBase, laptopUrl } from './laptop.ts';
 import { friendlyMangaError } from '../../../shared/mangaErrors.ts';
 
@@ -40,7 +41,7 @@ export type PreparedChapter = {
   chinese?: boolean;
 };
 
-export type PageBlock = { box: [number, number, number, number]; vertical: boolean; text: string };
+export type PageBlock = { readings?: Printed[]; box: [number, number, number, number]; vertical: boolean; text: string };
 export type ChapterData = {
   key: string;
   mangaKey: string;
@@ -371,7 +372,7 @@ export async function reportProgress(body: { mangaKey: string; chapterKey: strin
 }
 
 /** Returns true when it reached the inbox right away, false when it is queued. */
-export async function mineLine(body: { mangaKey: string; chapterKey: string; page: number; block?: number; text: string; targetHint?: string }): Promise<boolean> {
+export async function mineLine(body: { readings?: Printed[]; mangaKey: string; chapterKey: string; page: number; block?: number; text: string; targetHint?: string }): Promise<boolean> {
   try {
     await send('POST', '/api/manga/mine', { ...body, at: new Date().toISOString() });
     return true;

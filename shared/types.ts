@@ -1,3 +1,5 @@
+import type { Printed } from './readings.ts';
+
 // Types shared by server, PWA and extension. Keep this file free of runtime code
 // that depends on Node or the DOM.
 
@@ -52,6 +54,8 @@ export type Moment = {
   syncOffset?: number;
   /** Word the user picked when mining a text, preselected as target */
   targetHint?: string;
+  /** Furigana printed next to the text on the page (shared/readings.ts) */
+  readings?: Printed[];
   /** Set when the card was created */
   noteId?: number;
   /** What the card was made from (the candidates stay untouched so it can be redone). */

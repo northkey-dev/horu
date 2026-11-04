@@ -2,6 +2,7 @@ import type { IpadicFeatures, Tokenizer } from 'kuromoji';
 // The prebuilt browser bundle; the package's main entry needs Node's `path`.
 import kuromoji from 'kuromoji/build/kuromoji.js';
 import { laptopUrl, servedByLaptop } from './laptop.ts';
+import { correctTokens, printedReading, type Printed } from '../../../shared/readings.ts';
 import { alignReading, furiganaHtml, readingFromTokens, toHiragana } from '../../../shared/furigana.ts';
 import { kanjiOf, type KanjiInfo } from '../../../shared/kanji.ts';
 
@@ -39,7 +40,12 @@ export function getTokenizer(): Promise<Tokenizer<IpadicFeatures>> {
       if (err) {
         tokenizerPromise = undefined;
         reject(err);
-      } else resolve(t);
+      } else {
+        // The same corrected readings as on the laptop (shared/readings.ts).
+        const tokenize = t.tokenize.bind(t);
+        t.tokenize = (text) => correctTokens(tokenize(text));
+        resolve(t);
+      }
     }),
   );
   return tokenizerPromise;
@@ -71,8 +77,8 @@ export async function tokenize(text: string): Promise<Token[]> {
 }
 
 /** Card fields the laptop would compute: furigana HTML of the sentence and the reading of the target. */
-export async function cardText(sentence: string, start: number, end: number, word: string): Promise<{ furigana: string; reading: string }> {
-  const asParts = (list: Token[]) => list.map((t) => ({ surface: t.surface, reading: t.reading || undefined }));
+export async function cardText(sentence: string, start: number, end: number, word: string, printed?: Printed[]): Promise<{ furigana: string; reading: string }> {
+  const asParts = (list: Token[]) => list.map((t) => ({ surface: t.surface, reading: printedReading(t.surface, printed) ?? (t.reading || undefined) }));
   return { furigana: furiganaHtml(asParts(await tokenizeLocal(sentence)), start, end), reading: readingFromTokens(asParts(await tokenizeLocal(word))) };
 }
 

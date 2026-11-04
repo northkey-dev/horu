@@ -380,7 +380,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
   async function mine(targetHint?: string) {
     if (!data || block === undefined || !current) return;
     try {
-      const sent = await mineLine({ mangaKey: data.mangaKey, chapterKey, page: view!.page, block, text: textOf(block), targetHint });
+      const sent = await mineLine({ readings: current.blocks[block].readings, mangaKey: data.mangaKey, chapterKey, page: view!.page, block, text: textOf(block), targetHint });
       setToast(sent ? (targetHint ? `Added to inbox with ${targetHint}` : 'Added to inbox') : 'Saved · goes to the inbox when the laptop is reachable');
     } catch (e) {
       setToast((e as Error).message);
@@ -484,6 +484,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
         <TextSheet
           key={`${view?.page}/${block}`}
           text={textOf(block)}
+          readings={current.blocks[block].readings}
           edited={edits[editKey(block)] !== undefined}
           source={`${data.mangaTitle} · ${data.name}`}
           context={current.blocks.slice(Math.max(0, block - 3), block).map((_, k) => textOf(Math.max(0, block - 3) + k))}

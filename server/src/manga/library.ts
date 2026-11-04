@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DATA_DIR, MANGA_DIR, safeId, writeJsonAtomic } from '../config.ts';
 import { readJsonKeepingDamaged } from '../jsonFile.ts';
+import type { Printed } from '../../../shared/readings.ts';
 
 // Horu's own manga state: which manga are being read, reading progress and the
 // chapters prepared (downloaded + OCR'd) for offline reading on the phone.
@@ -47,7 +48,7 @@ export type PreparedChapter = {
   rereadPages?: number;
 };
 
-export type PageBlock = { box: [number, number, number, number]; vertical: boolean; text: string };
+export type PageBlock = { box: [number, number, number, number]; vertical: boolean; text: string; readings?: Printed[] };
 export type ChapterPage = { file: string; w: number; h: number; blocks: PageBlock[] };
 export type ChapterData = { key: string; mangaKey: string; mangaTitle: string; name: string; order: number; pages: ChapterPage[] };
 

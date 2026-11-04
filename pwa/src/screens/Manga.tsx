@@ -459,7 +459,7 @@ function LocalDetail({ mangaKey, online }: { mangaKey: string; online: boolean }
           </button>
         </div>
       )}
-      {editing && <p className="footnote">For chapters prepared by an older Horu. About five minutes per chapter on the laptop; you can keep reading meanwhile. Corrections you made by hand stay.</p>}
+      {editing && <p className="footnote">For chapters prepared by an older Horu. About eight seconds per page on the laptop; you can keep reading meanwhile. Corrections you made by hand stay.</p>}
       {online && active + paused > 1 && (
         <div className="group">
           <div className="cell">

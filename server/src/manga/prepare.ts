@@ -1,3 +1,7 @@
+import { loadKanjidic } from '../kanji.ts';
+import { lookupIndex } from '../dict.ts';
+import { tokenizer } from '../japanese.ts';
+import { realWords, trustedPrinted } from '../../../shared/readings.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { getSettings } from '../config.ts';
@@ -13,7 +17,7 @@ import * as suwa from './suwayomi.ts';
 // "next N chapters" window filled for every manga marked as reading.
 
 const ocr = new PyWorker('ocr', 'ocr_worker.py', () => [], 5 * 60_000);
-type OcrPage = { page: { img_width: number; img_height: number; blocks: { box: number[]; vertical: boolean; lines: string[] }[] } };
+type OcrPage = { page: { img_width: number; img_height: number; blocks: { box: number[]; vertical: boolean; lines: string[]; furigana?: { base: string; ruby: string }[] }[] } };
 
 export function ocrAvailable(): boolean {
   return ocr.available();
@@ -128,13 +132,21 @@ export function pauseManga(mangaKey: string, pause: boolean): void {
   }
 }
 
-function chapterPage(file: string, res: OcrPage): lib.ChapterPage {
+async function chapterPage(file: string, res: OcrPage): Promise<lib.ChapterPage> {
+  const dic = await loadKanjidic().catch(() => ({}));
+  const index = lookupIndex();
+  const known = (word: string) => index?.get(word)?.flatMap((e) => e[1].split('|')) ?? [];
+  const tokens = await tokenizer();
   return {
     file,
     w: res.page.img_width,
     h: res.page.img_height,
     blocks: res.page.blocks
-      .map((b) => ({ box: b.box.slice(0, 4) as [number, number, number, number], vertical: b.vertical, text: b.lines.join('') }))
+      .map((b) => {
+        const text = b.lines.join('');
+        const readings = realWords(trustedPrinted(b.furigana ?? [], dic, known), tokens.tokenize(text), known);
+        return { box: b.box.slice(0, 4) as [number, number, number, number], vertical: b.vertical, text, ...(readings.length ? { readings } : {}) };
+      })
       .filter((b) => b.text.trim()),
   };
 }
@@ -165,7 +177,7 @@ async function drainRereads(): Promise<void> {
         const pages: lib.ChapterPage[] = [];
         lib.updateChapter(key, { rereadPages: 0 });
         for (const page of data.pages) {
-          pages.push(chapterPage(page.file, await ocr.request<OcrPage>({ file: path.join(lib.chapterDir(key), page.file) })));
+          pages.push(await chapterPage(page.file, await ocr.request<OcrPage>({ file: path.join(lib.chapterDir(key), page.file) })));
           lib.updateChapter(key, { rereadPages: pages.length });
         }
         lib.writeChapterData({ ...data, pages });
@@ -220,7 +232,7 @@ async function prepare(chapter: lib.PreparedChapter): Promise<void> {
     let page: lib.ChapterPage = { file: files[i], w: 0, h: 0, blocks: [] };
     if (ocr.available()) {
       // shrink: colour scans are often saved at a needlessly high JPEG quality; smaller pages turn faster on the phone.
-      page = chapterPage(files[i], await ocr.request<OcrPage>({ file: path.join(dir, files[i]), shrink: true }));
+      page = await chapterPage(files[i], await ocr.request<OcrPage>({ file: path.join(dir, files[i]), shrink: true }));
     }
     pages.push(page);
     lib.updateChapter(chapter.key, { pagesDone: i + 1 });

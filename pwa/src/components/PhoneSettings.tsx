@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useEventTick } from '../lib/hooks.ts';
-import { localMoments, phoneJimakuKey, quickContinue, setPhoneJimakuKey, setQuickContinue, setTranslatesAhead, translatesAhead } from '../lib/phone.ts';
+import { localMoments, phoneJimakuKey, quickContinue, setPhoneJimakuKey, setQuickContinue, setTranslatesAhead, setWordByWord, translatesAhead, wordByWord } from '../lib/phone.ts';
 
 // Settings → This phone: what the phone needs to watch without the laptop. Stored on the phone only.
 
@@ -32,6 +32,13 @@ export function PhoneSettings() {
           <span className="grow">
             Translate ahead
             <span className="hint">A speech bubble or photo line starts translating when you open it, so Translate answers at once. Costs one AI request per line you open, also if you never press Translate.</span>
+          </span>
+        </label>
+        <label className="toggle">
+          <input type="checkbox" checked={wordByWord()} onChange={(e) => setWordByWord(e.target.checked)} />
+          <span className="grow">
+            Word by word
+            <span className="hint">A translation also lists every word of the line with its reading and meaning. Makes the answer a little longer.</span>
           </span>
         </label>
         {waiting > 0 && (

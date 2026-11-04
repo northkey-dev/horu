@@ -3,6 +3,7 @@ import { alignReading, kanjiInfo, tokenize, type KanjiInfo, type Lookup, type To
 import { guessReading, KANJI_CHAR } from '../../../shared/kanji.ts';
 import { statusOf } from '../lib/words.ts';
 import type { WordStatus } from '../../../shared/words.ts';
+import { printedReading, type Printed } from '../../../shared/readings.ts';
 import { WordSheet } from './WordSheet.tsx';
 
 // Japanese text where every word can be tapped for a dictionary lookup. With `highlight`, words not known
@@ -17,6 +18,8 @@ type Props = {
   className?: string;
   highlight?: boolean;
   pickLabel?: string;
+  /** Furigana the page prints: it wins over the dictionary */
+  printed?: Printed[];
   /** Show the furigana switch under the text (the reader has one for all paragraphs) */
   furiganaToggle?: boolean;
 };
@@ -33,7 +36,7 @@ function readFurigana(): boolean {
   }
 }
 
-export function TokenText({ text, target, suggested, onPick, onTokens, className = 'sentence', highlight, pickLabel, furiganaToggle = true }: Props) {
+export function TokenText({ text, target, suggested, onPick, onTokens, className = 'sentence', highlight, pickLabel, furiganaToggle = true, printed }: Props) {
   const [tokens, setTokens] = useState<Token[]>();
   const [statuses, setStatuses] = useState<Record<string, WordStatus | undefined>>();
   const [open, setOpen] = useState<number>();
@@ -53,8 +56,9 @@ export function TokenText({ text, target, suggested, onPick, onTokens, className
   useEffect(() => {
     let alive = true;
     tokenize(text).then(
-      (t) => {
+      (read) => {
         if (!alive) return;
+        const t = read.map((x) => ({ ...x, reading: printedReading(x.surface, printed) ?? x.reading }));
         setTokens(t);
         onTokens?.(t);
         if (highlight) statusOf([...new Set(t.filter(isWord).map((x) => x.base))]).then((s) => alive && setStatuses(s), () => undefined);

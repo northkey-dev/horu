@@ -52,7 +52,7 @@ async function build(id: string, req: CardRequest, opts: { skipAi?: boolean }): 
   // Nothing to hear (manga, text, a photo): a computer voice reads the sentence. Without it the card is still a card.
   if (!clip && ttsOn()) {
     const voice = store.mediaPath(id, 'clip.mp3');
-    await speak(sentence, voice).then(
+    await speak(sentence, voice, moment.readings).then(
       () => (clip = voice),
       (err: Error) => log.warn('Voice for the card failed', err.message),
     );
@@ -60,7 +60,7 @@ async function build(id: string, req: CardRequest, opts: { skipAi?: boolean }): 
 
   let ai: Explanation = req.explanation ?? { targetReading: '', targetMeaning: '', translation: '', explanation: '' };
   if (!opts.skipAi && !req.explanation) {
-    const input = { sentence, target: req.targetDictForm && req.targetDictForm !== target ? `${target} (${req.targetDictForm})` : target, context: req.context, source: moment.sourceLabel };
+    const input = { sentence, target: req.targetDictForm && req.targetDictForm !== target ? `${target} (${req.targetDictForm})` : target, context: req.context, source: moment.sourceLabel, readings: moment.readings };
     try {
       ai = await explainOnLaptop(input);
     } catch (err) {
@@ -75,7 +75,7 @@ async function build(id: string, req: CardRequest, opts: { skipAi?: boolean }): 
 
   const noteId = await addNote({
     sentence: highlight(sentence, req.targetStart, req.targetEnd),
-    sentenceFurigana: await furiganaHtml(sentence, req.targetStart, req.targetEnd),
+    sentenceFurigana: await furiganaHtml(sentence, req.targetStart, req.targetEnd, moment.readings),
     target: req.targetDictForm || target,
     targetReading: ai.targetReading,
     targetMeaning: ai.targetMeaning,
@@ -117,11 +117,12 @@ const translations = new Map<string, Translation>();
 
 /** Translation of a line (manga speech bubble) by the same AI; the last few hundred are kept. */
 export async function translateOnLaptop(input: TranslateInput): Promise<Translation> {
-  const cached = translations.get(input.text);
+  const key = `${input.wordByWord ? 'w' : ''}${input.text}`;
+  const cached = translations.get(key);
   if (cached) return cached;
   const s = getSettings();
   const result = s.aiEngine === 'claude' ? await translate(input) : await translateWith({ service: s.aiEngine, key: s.aiApiKey, model: s.aiModel, url: s.ollamaUrl }, input, s.learnerProfile);
-  translations.set(input.text, result);
+  translations.set(key, result);
   if (translations.size > 500) translations.delete(translations.keys().next().value!);
   return result;
 }

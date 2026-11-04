@@ -3,6 +3,7 @@ import { TokenText } from './TokenText.tsx';
 import { Sheet } from './Sheet.tsx';
 import { translateAhead, translateLine } from '../lib/cards.ts';
 import type { Translation } from '../../../shared/ai.ts';
+import type { Printed } from '../../../shared/readings.ts';
 
 // Bottom sheet for one piece of text read off a picture (a manga speech bubble, a line on a photo):
 // words with the dictionary, the text fixed by hand, translated as a whole, or mined. The caller mounts it
@@ -19,18 +20,20 @@ type Props = {
   context: string[];
   /** A corrected text, or undefined to go back to the recognised one */
   onEdit: (text: string | undefined) => void;
+  /** Furigana the page prints for this text */
+  readings?: Printed[];
   /** Mine the line, with the tapped word already chosen when there is one */
   onMine: (targetHint?: string) => void;
   onClose: () => void;
 };
 
-export function TextSheet({ text, edited, source, context, onEdit, onMine, onClose }: Props) {
+export function TextSheet({ text, readings, edited, source, context, onEdit, onMine, onClose }: Props) {
   const [translation, setTranslation] = useState<Translation | 'busy' | 'copied' | { error: string }>();
   const [draft, setDraft] = useState<string>();
 
   // A moment after opening, so flipping through bubbles costs nothing. Closing the sheet cancels it.
   useEffect(() => {
-    const ahead = setTimeout(() => translateAhead({ text, context, source }), 600);
+    const ahead = setTimeout(() => translateAhead({ text, context, source, readings }), 600);
     return () => clearTimeout(ahead);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text]);
@@ -38,7 +41,7 @@ export function TextSheet({ text, edited, source, context, onEdit, onMine, onClo
   async function translate() {
     setTranslation('busy');
     try {
-      setTranslation(await translateLine({ text, context, source }));
+      setTranslation(await translateLine({ text, context, source, readings }));
     } catch (e) {
       setTranslation({ error: (e as Error).message });
     }
@@ -53,7 +56,7 @@ export function TextSheet({ text, edited, source, context, onEdit, onMine, onClo
   return (
     <Sheet className="reader-sheet" onClose={onClose}>
       {draft === undefined ? (
-        <TokenText text={text} className="sentence" highlight pickLabel="Mine with this word" onPick={(l) => onMine(l.form)} />
+        <TokenText text={text} printed={readings} className="sentence" highlight pickLabel="Mine with this word" onPick={(l) => onMine(l.form)} />
       ) : (
         <div>
           <textarea className="jp bubble-edit" rows={3} value={draft} autoFocus onChange={(e) => setDraft(e.target.value)} />
@@ -89,6 +92,18 @@ export function TextSheet({ text, edited, source, context, onEdit, onMine, onClo
             <>
               <p>{translation.translation}</p>
               {translation.notes && <p className="hint">{translation.notes}</p>}
+              {!!translation.words?.length && (
+                <dl className="word-list">
+                  {translation.words.map((w, i) => (
+                    <div key={i}>
+                      <dt className="jp">
+                        {w.word} <span className="muted">{w.reading}</span>
+                      </dt>
+                      <dd>{w.meaning}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
             </>
           )}
         </div>
