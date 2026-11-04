@@ -56,12 +56,14 @@ const server = spawn(process.execPath, [path.join(root, 'server', 'src', 'main.t
   env: { ...process.env, HORU_PORT: String(PORT), HORU_DATA: 'data-smoke', HORU_ANKI_URL: `http://127.0.0.1:${ANKI_PORT}`, HORU_JIMAKU_URL: `http://127.0.0.1:${JIMAKU_PORT}` },
   stdio: 'ignore',
 });
-const stop = () => {
+const stop = async () => {
+  const exited = new Promise((r) => server.once('exit', r));
   server.kill();
   jimaku.close();
   anki.closeAllConnections();
   anki.close();
-  fs.rmSync(dataDir, { recursive: true, force: true });
+  await exited; // it may still be writing, the dictionary download for example
+  fs.rmSync(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 };
 
 const call = async (method, url, body) => {
@@ -350,7 +352,7 @@ try {
     assert.ok([200, 503].includes(res.status));
   });
 } finally {
-  stop();
+  await stop();
 }
 
 console.log(failed ? `\n${failed} check(s) failed` : '\nall checks passed');
