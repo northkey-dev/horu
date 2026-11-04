@@ -23,6 +23,7 @@ Set-Location $root
 $optional = [ordered]@{
   whisper = 'Whisper speech recognition (marks without subtitles)'
   manga   = 'Manga sources (Suwayomi) and text recognition (mokuro)'
+  tts     = 'A computer voice for cards without sound (about 120 MB)'
   claude  = 'Claude Code for card explanations'
   ollama  = 'Ollama (local AI) for card explanations'
 }
@@ -122,6 +123,26 @@ if (& $want 'manga') {
     Remove-Item $tmp, $zip -Recurse -Force
   }
   Write-Host 'Manga sources come from an extension repository you add in Settings -> Manga (Horu ships none).'
+}
+
+if (& $want 'tts') {
+  Write-Host '== tts: a computer voice for cards (Kokoro)' -ForegroundColor Cyan
+  Pip @('kokoro-onnx==0.6.1', 'misaki[ja]==0.7.4', 'soundfile==0.14.0')
+  $dir = Join-Path $root 'tools\tts'
+  New-Item -ItemType Directory -Force $dir | Out-Null
+  $files = @{
+    'kokoro-v1.0.int8.onnx' = '6e742170d309016e5891a994e1ce1559c702a2ccd0075e67ef7157974f6406cb'
+    'voices-v1.0.bin'       = 'bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d'
+  }
+  foreach ($name in $files.Keys) {
+    $file = Join-Path $dir $name
+    if (Test-Path $file) { continue }
+    Invoke-WebRequest "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/$name" -OutFile $file
+    if ((Get-FileHash $file -Algorithm SHA256).Hash -ne $files[$name]) {
+      Remove-Item $file -Force
+      throw "The download of $name does not match its checksum."
+    }
+  }
 }
 
 if (& $want 'claude') {

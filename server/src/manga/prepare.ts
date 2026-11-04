@@ -128,6 +128,57 @@ export function pauseManga(mangaKey: string, pause: boolean): void {
   }
 }
 
+function chapterPage(file: string, res: OcrPage): lib.ChapterPage {
+  return {
+    file,
+    w: res.page.img_width,
+    h: res.page.img_height,
+    blocks: res.page.blocks
+      .map((b) => ({ box: b.box.slice(0, 4) as [number, number, number, number], vertical: b.vertical, text: b.lines.join('') }))
+      .filter((b) => b.text.trim()),
+  };
+}
+
+// ---- reading a finished chapter again (a better text recognition) ----
+
+const toReread: string[] = [];
+let rereading = false;
+
+/** Queues a chapter. It stays readable: the new text replaces the old one when the whole chapter is through. */
+export function rereadChapter(key: string): void {
+  if (lib.getChapter(key)?.status !== 'ready') throw new Error('Only finished chapters can be read again');
+  if (!ocr.available()) throw new Error('Text recognition is not installed on the laptop.');
+  lib.updateChapter(key, { rereading: true });
+  if (!toReread.includes(key)) toReread.push(key);
+  void drainRereads();
+}
+
+async function drainRereads(): Promise<void> {
+  if (rereading) return;
+  rereading = true;
+  try {
+    while (toReread.length) {
+      const key = toReread.shift()!;
+      try {
+        const data = lib.readChapterData(key);
+        if (!data) continue; // deleted in the meantime
+        const pages: lib.ChapterPage[] = [];
+        for (const page of data.pages) pages.push(chapterPage(page.file, await ocr.request<OcrPage>({ file: path.join(lib.chapterDir(key), page.file) })));
+        lib.writeChapterData({ ...data, pages });
+        // A new date, so a phone with this chapter saved fetches the new text with its next sync.
+        lib.updateChapter(key, { preparedAt: new Date().toISOString() });
+        log.info(`Read again: ${data.mangaTitle} / ${data.name}`);
+      } catch (err) {
+        log.warn(`Reading ${key} again failed`, err);
+      } finally {
+        lib.updateChapter(key, { rereading: undefined });
+      }
+    }
+  } finally {
+    rereading = false;
+  }
+}
+
 async function prepare(chapter: lib.PreparedChapter): Promise<void> {
   const dir = lib.chapterDir(chapter.key);
   fs.mkdirSync(dir, { recursive: true });
@@ -165,15 +216,7 @@ async function prepare(chapter: lib.PreparedChapter): Promise<void> {
     let page: lib.ChapterPage = { file: files[i], w: 0, h: 0, blocks: [] };
     if (ocr.available()) {
       // shrink: colour scans are often saved at a needlessly high JPEG quality; smaller pages turn faster on the phone.
-      const res = await ocr.request<OcrPage>({ file: path.join(dir, files[i]), shrink: true });
-      page = {
-        file: files[i],
-        w: res.page.img_width,
-        h: res.page.img_height,
-        blocks: res.page.blocks
-          .map((b) => ({ box: b.box.slice(0, 4) as [number, number, number, number], vertical: b.vertical, text: b.lines.join('') }))
-          .filter((b) => b.text.trim()),
-      };
+      page = chapterPage(files[i], await ocr.request<OcrPage>({ file: path.join(dir, files[i]), shrink: true }));
     }
     pages.push(page);
     lib.updateChapter(chapter.key, { pagesDone: i + 1 });
@@ -279,6 +322,8 @@ export function startMangaWorker(): void {
   for (const c of lib.allChapters()) {
     if (c.status === 'downloading' || c.status === 'ocr') lib.updateChapter(c.key, { status: 'queued', pagesDone: 0 });
   }
+  // Chapters that were being read again when the service stopped.
+  for (const c of lib.allChapters()) if (c.rereading) rereadChapter(c.key);
   // Chapters prepared before the language check.
   for (const c of lib.allChapters()) {
     if (c.status !== 'ready' || 'chinese' in c) continue;

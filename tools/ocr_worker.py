@@ -13,6 +13,7 @@ Models are loaded once and stay in memory while the server keeps this process al
 import io
 import json
 import os
+import re
 import sys
 
 sys.stdout.reconfigure(encoding="utf-8")
@@ -21,7 +22,97 @@ from mokuro.manga_page_ocr import MangaPageOcr  # noqa: E402  (slow import, afte
 
 from PIL import Image  # noqa: E402  (comes with mokuro)
 
+import cv2  # noqa: E402  (comes with mokuro)
+import numpy as np  # noqa: E402
+
 ocr = MangaPageOcr(force_cpu=True)
+mocr = ocr.mocr  # the model itself; ocr.mocr is replaced below
+
+
+# ---- furigana ----
+# The detector's box around a column is sometimes too wide and takes the small reading next to it along, and the
+# model reads that too: 月収まん for 月収. Furigana is a thin band beside the main text, so thin bands are painted
+# over and the line is read again. That answer only counts when nothing but kana went missing: a band that was
+# part of the text changes more than that, and the first reading stays.
+
+KANA = re.compile(r"[぀-ヿ]")
+split_line = MangaPageOcr.split_into_chunks
+line_is_vertical = False
+
+
+def split_noting_direction(img, mask_refined, blk, line_idx, **kwargs):
+    global line_is_vertical
+    line_is_vertical = bool(blk.vertical)
+    return split_line(img, mask_refined, blk, line_idx, **kwargs)
+
+
+def ink_bands(ink):
+    """Runs of rows with ink, as (start, end)."""
+    rows = ink.sum(axis=1) > max(1, ink.shape[1] * 0.01)
+    bands = []
+    start = None
+    for i, on in enumerate(rows):
+        if on and start is None:
+            start = i
+        elif not on and start is not None:
+            bands.append((start, i))
+            start = None
+    if start is not None:
+        bands.append((start, len(rows)))
+    return bands
+
+
+def without_furigana(im, vertical):
+    """The line with thin bands painted over, or None when it has none. Vertical lines come upright, so furigana
+    is left and right of the text there: the picture is turned to look at rows either way."""
+    gray = np.array(im.convert("L"))
+    if vertical:
+        gray = np.rot90(gray)
+    _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    ink = binary == 0
+    if ink.mean() > 0.5:  # white text on a dark background
+        ink = ~ink
+    bands = ink_bands(ink)
+    if len(bands) < 2:
+        return None
+    main = max(bands, key=lambda b: b[1] - b[0])
+    size = main[1] - main[0]
+    if size < (bands[-1][1] - bands[0][0]) * 0.33:  # no clear main text
+        return None
+    thin = [b for b in bands if b != main and 0.15 * size <= b[1] - b[0] <= 0.65 * size]
+    if not thin:
+        return None
+    background = int(np.median(gray[~ink])) if (~ink).any() else 255
+    painted = gray.copy()
+    for top, bottom in thin:
+        painted[top:bottom, :] = background
+    if vertical:
+        painted = np.rot90(painted, -1)
+    return Image.fromarray(np.ascontiguousarray(painted)).convert("RGB")
+
+
+def only_kana_gone(before, after):
+    """True when `after` is `before` with some kana taken out and nothing else changed."""
+    i = 0
+    for ch in before:
+        if i < len(after) and after[i] == ch:
+            i += 1
+        elif not KANA.match(ch):
+            return False
+    return i == len(after) and 0 < len(after) < len(before)
+
+
+def read_line(im):
+    text = mocr(im)
+    clean = without_furigana(im, line_is_vertical)
+    if clean is None:
+        return text
+    other = mocr(clean)
+    return other if only_kana_gone(text, other) else text
+
+
+ocr.split_into_chunks = split_noting_direction
+ocr.mocr = read_line
 
 
 def shrink(file):
@@ -51,7 +142,7 @@ def read_crop(im, box):
     w, h = crop.size
     if h > w * 1.4:  # vertical writing: the model reads horizontal lines, so turn it like mokuro does
         crop = crop.rotate(-90, expand=True)
-    return ocr.mocr(crop)
+    return mocr(crop)
 
 
 def read_region(file, box):

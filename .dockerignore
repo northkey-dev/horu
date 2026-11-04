@@ -8,6 +8,7 @@ data
 data-*
 tools/.venv
 tools/suwayomi
+tools/tts
 tools/launcher
 pwa/dist
 extension/dist

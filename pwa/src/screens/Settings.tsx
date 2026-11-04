@@ -20,7 +20,7 @@ import type { Settings as S, Status } from '../../../shared/types.ts';
 
 const MPV_PIPE = String.raw`\\.\pipe\mpvsocket`;
 
-type Toggle = 'jlptBaseline' | 'autoMatchWhisper' | 'kanjiCards' | 'animeScreenshot' | 'reminderEnabled' | 'prepBeforeWatch' | 'prepBeforeRead' | 'showAdultSources';
+type Toggle = 'jlptBaseline' | 'autoMatchWhisper' | 'kanjiCards' | 'animeScreenshot' | 'voiceCards' | 'reminderEnabled' | 'prepBeforeWatch' | 'prepBeforeRead' | 'showAdultSources';
 
 export function Settings({ status }: { status?: Status }) {
   const [s, setS] = useState<S>();
@@ -219,11 +219,12 @@ export function Settings({ status }: { status?: Status }) {
             <StatusRow label="Whisper" ok={modules.whisper} value={modules.whisper ? 'Installed' : 'Not installed'} />
             <StatusRow label="Manga sources" ok={modules.manga} value={modules.manga ? 'Installed' : 'Not installed'} />
             <StatusRow label="Text recognition" ok={modules.ocr} value={modules.ocr ? 'Installed' : 'Not installed'} />
+            <StatusRow label="Voice for cards" ok={modules.voice} value={modules.voice ? 'Installed' : 'Not installed'} />
             <StatusRow label="Claude Code" ok={modules.claude} value={modules.claude ? 'Installed' : 'Not installed'} />
             <StatusRow label="Ollama" ok={modules.ollama} value={modules.ollama ? 'Running' : 'Not running'} />
           </div>
           <p className="footnote">
-            Add one later on the laptop: <code>scripts\install.ps1 -Modules whisper,manga,claude,ollama</code> (pick the ones you want).
+            Add one later on the laptop: <code>scripts\install.ps1 -Modules whisper,manga,tts,claude,ollama</code> (pick the ones you want).
           </p>
         </>
       )}
@@ -291,6 +292,7 @@ export function Settings({ status }: { status?: Status }) {
               <div className="hint">Level and goals, so explanations fit. Phones use it too unless they set their own.</div>
             </label>
             {toggle('animeScreenshot', 'Screenshot on anime cards', 'Off: anime cards only get sentence and audio. Manga cards always get their panel.')}
+            {modules?.voice && toggle('voiceCards', 'Voice on cards without sound', 'Manga, text and photo cards get a computer voice reading the sentence. It runs on the laptop and costs nothing. It can misread a word: the furigana on the card count.')}
             {toggle('kanjiCards', 'Kanji cards', 'Also add one card per new kanji of a target word (subdeck “::Kanji”).')}
           </div>
 

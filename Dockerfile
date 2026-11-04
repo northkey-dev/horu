@@ -26,7 +26,7 @@ WORKDIR /app
 
 RUN set -eux; \
     packages="ffmpeg curl ca-certificates tini"; \
-    case ",$MODULES," in *,manga,*|*,whisper,*) packages="$packages python3 python3-venv libgl1 libglib2.0-0";; esac; \
+    case ",$MODULES," in *,manga,*|*,whisper,*|*,tts,*) packages="$packages python3 python3-venv libgl1 libglib2.0-0 libsndfile1";; esac; \
     case ",$MODULES," in *,manga,*) packages="$packages openjdk-21-jre-headless";; esac; \
     apt-get update; \
     apt-get install -y --no-install-recommends $packages; \
@@ -68,6 +68,14 @@ RUN set -eux; \
       echo 'af9feb20af9d7ebe9e30769e6c6ebc7fc7ab1c447388d42e0280b1da5fe07bfd  tools/suwayomi/bin/Suwayomi-Server.jar' | sha256sum -c -;; \
     esac; \
     case ",$MODULES," in *,whisper,*) tools/.venv/bin/pip install --no-cache-dir 'faster-whisper==1.2.1';; esac; \
+    case ",$MODULES," in *,tts,*) \
+      [ -d tools/.venv ] || python3 -m venv tools/.venv; \
+      tools/.venv/bin/pip install --no-cache-dir 'kokoro-onnx==0.6.1' 'misaki[ja]==0.7.4' 'soundfile==0.14.0'; \
+      mkdir -p tools/tts; \
+      curl -fL https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.int8.onnx -o tools/tts/kokoro-v1.0.int8.onnx; \
+      curl -fL https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin -o tools/tts/voices-v1.0.bin; \
+      printf '%s  %s\n' 6e742170d309016e5891a994e1ce1559c702a2ccd0075e67ef7157974f6406cb tools/tts/kokoro-v1.0.int8.onnx bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d tools/tts/voices-v1.0.bin | sha256sum -c -;; \
+    esac; \
     chmod -R a+rwX /opt/cache; \
     rm -rf "$HOME"
 

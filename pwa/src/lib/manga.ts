@@ -32,6 +32,8 @@ export type PreparedChapter = {
   pageCount: number;
   pagesDone: number;
   preparedAt?: string;
+  /** The laptop reads the text again; the chapter stays readable */
+  rereading?: boolean;
   readAt?: string;
   chinese?: boolean;
 };
@@ -155,6 +157,8 @@ export const mangaApi = {
     return freed;
   },
   resumeChapter: (key: string) => send<PreparedChapter>('POST', `/api/manga/chapters/${key}/resume`),
+  rereadChapter: (key: string) => send<PreparedChapter>('POST', `/api/manga/chapters/${key}/reread`),
+  rereadManga: (key: string) => send<PreparedChapter[]>('POST', `/api/manga/library/${key}/reread`),
   pauseDownloads: (mangaKey: string, pause: boolean) => send<PreparedChapter[]>('POST', `/api/manga/library/${mangaKey}/downloads`, { pause }),
   serverSearch: (q: string) => get<{ id: string; name: string; books?: number }[]>(`/api/manga/server/search?q=${encodeURIComponent(q)}`),
   serverBooks: (id: string) => get<{ id: string; name: string }[]>(`/api/manga/server/series/${encodeURIComponent(id)}`),

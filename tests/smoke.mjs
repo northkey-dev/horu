@@ -347,6 +347,12 @@ try {
     }
   });
 
+  await check('voice and reading again: refused without anything to work on', async () => {
+    assert.equal((await call('POST', '/api/tts', { text: ' ' })).status, 404);
+    assert.equal((await call('POST', '/api/manga/chapters/nothing/reread')).status, 400);
+    assert.equal(typeof (await call('GET', '/api/modules')).json.voice, 'boolean');
+  });
+
   await check('pwa shell is served', async () => {
     const res = await fetch(base + '/');
     assert.ok([200, 503].includes(res.status));

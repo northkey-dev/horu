@@ -250,7 +250,7 @@ export const api = {
   words: () => mirrored('words', () => request<WordState>('GET', '/api/insights/words', undefined, {}, 30_000)),
   importKnown: (source: 'jpdb' | 'wanikani' | 'list', input: string) =>
     request<{ count: number }>('POST', '/api/insights/known/import', source === 'list' ? { source, text: input } : { source, key: input }, {}, SLOW),
-  modules: () => request<{ whisper: boolean; manga: boolean; ocr: boolean; claude: boolean; ollama: boolean }>('GET', '/api/modules', undefined, {}, 20_000),
+  modules: () => request<{ whisper: boolean; manga: boolean; ocr: boolean; voice: boolean; claude: boolean; ollama: boolean }>('GET', '/api/modules', undefined, {}, 20_000),
   playerNow: () => request<{ player: string; title: string; episode?: number; position: number; duration?: number; playing: boolean } | null>('GET', '/api/player/now', undefined, {}, 8000),
   importLines: (text: string, name: string) => request<{ count: number }>('POST', '/api/text/import', { text, name }, {}, 60_000),
   fetchArticle: (url: string) => request<{ title: string; text: string }>('GET', `/api/text/fetch?url=${encodeURIComponent(url)}`, undefined, {}, 30_000),

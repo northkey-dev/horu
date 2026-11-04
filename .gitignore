@@ -6,6 +6,7 @@ tools/launcher/*.exe
 *.log
 
 tools/suwayomi/
+tools/tts/
 data-e2e/
 
 data-smoke/

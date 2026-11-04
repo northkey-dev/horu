@@ -7,6 +7,7 @@ import { cardText } from './japanese.ts';
 import { downsample, toWav } from './mic.ts';
 import { recall, remember, mirroredMedia } from './mirror.ts';
 import { api, laptopUp } from './api.ts';
+import { laptopUrl } from './laptop.ts';
 import { translatesAhead } from './phone.ts';
 
 // Cards made on the phone. The laptop stays the default when it is reachable (its Anki, its AI); without it
@@ -182,6 +183,23 @@ async function cutClip(blob: Blob, from: number, to: number): Promise<Blob> {
   return toWav(downsample(mono, buf.sampleRate, rate), rate);
 }
 
+/** A computer voice from the laptop for a card without sound; a card without it is fine too. */
+async function laptopVoice(text: string): Promise<Blob | undefined> {
+  if (!laptopUp()) return undefined;
+  try {
+    const res = await fetch(laptopUrl('/api/tts'), {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    return res.ok ? await res.blob() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function build(moment: Moment, req: CardRequest, ai: Explanation | undefined, media: { audio?: string; image?: string }): Promise<Built> {
   const sentence = req.sentence.trim();
   const target = sentence.slice(req.targetStart, req.targetEnd);
@@ -199,6 +217,13 @@ async function build(moment: Moment, req: CardRequest, ai: Explanation | undefin
     const name = `horu_${moment.id}.${clip.type.includes('mpeg') ? 'mp3' : 'wav'}`;
     files.push({ name, data: new Uint8Array(await clip.arrayBuffer()) });
     audio = `[sound:${name}]`;
+  } else {
+    const voice = await laptopVoice(sentence);
+    if (voice) {
+      const name = `horu_${moment.id}.mp3`;
+      files.push({ name, data: new Uint8Array(await voice.arrayBuffer()) });
+      audio = `[sound:${name}]`;
+    }
   }
   const settings = (await recall<Settings>('settings'))?.value;
   const picture = media.image && moment.hasImage && (moment.kind !== 'anime' || settings?.animeScreenshot) ? await blobOf(media.image) : undefined;

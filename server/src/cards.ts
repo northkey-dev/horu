@@ -1,3 +1,4 @@
+import { speak, ttsOn } from './tts.ts';
 import fs from 'node:fs';
 import { cutClip } from './audio.ts';
 import { ClaudeError, explain, translate } from './claude.ts';
@@ -47,6 +48,14 @@ async function build(id: string, req: CardRequest, opts: { skipAi?: boolean }): 
     } else {
       fs.copyFileSync(store.mediaPath(id, 'mp3'), clip);
     }
+  }
+  // Nothing to hear (manga, text, a photo): a computer voice reads the sentence. Without it the card is still a card.
+  if (!clip && ttsOn()) {
+    const voice = store.mediaPath(id, 'clip.mp3');
+    await speak(sentence, voice).then(
+      () => (clip = voice),
+      (err: Error) => log.warn('Voice for the card failed', err.message),
+    );
   }
 
   let ai: Explanation = req.explanation ?? { targetReading: '', targetMeaning: '', translation: '', explanation: '' };

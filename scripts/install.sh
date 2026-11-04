@@ -28,10 +28,11 @@ done
 
 if [ -z "$modules" ]; then
   modules="core"
-  for m in whisper manga claude ollama; do
+  for m in whisper manga tts claude ollama; do
     case $m in
       whisper) label="Whisper speech recognition (marks without subtitles)" ;;
       manga) label="Manga sources (Suwayomi) and text recognition (mokuro)" ;;
+      tts) label="A computer voice for cards without sound (about 120 MB)" ;;
       claude) label="Claude Code for card explanations" ;;
       ollama) label="Ollama (local AI) for card explanations" ;;
     esac
@@ -108,6 +109,25 @@ pip_install() {
 if want whisper; then
   step "whisper: faster-whisper"
   pip_install 'faster-whisper==1.2.1'
+fi
+
+if want tts; then
+  step "tts: a computer voice for cards (Kokoro)"
+  pip_install 'kokoro-onnx==0.6.1' 'misaki[ja]==0.7.4' 'soundfile==0.14.0'
+  mkdir -p "$root/tools/tts"
+  for entry in kokoro-v1.0.int8.onnx:6e742170d309016e5891a994e1ce1559c702a2ccd0075e67ef7157974f6406cb voices-v1.0.bin:bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d; do
+    name="${entry%%:*}"
+    file="$root/tools/tts/$name"
+    [ -f "$file" ] && continue
+    curl -fL "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/$name" -o "$file.part"
+    sum="$( (sha256sum "$file.part" 2>/dev/null || shasum -a 256 "$file.part") | cut -d' ' -f1)"
+    if [ "$sum" != "${entry##*:}" ]; then
+      rm -f "$file.part"
+      echo "The download of $name does not match its checksum."
+      exit 1
+    fi
+    mv "$file.part" "$file"
+  done
 fi
 
 if want manga; then

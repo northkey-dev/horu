@@ -27,7 +27,8 @@ import { WordPrep } from '../components/WordPrep.tsx';
 const size = (bytes: number) => (bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${Math.max(1, Math.round(bytes / 1e6))} MB`);
 
 /** Trailing status of a chapter row. */
-function ChapterState({ status, offline, idle }: { status?: string; offline?: boolean; idle?: string }) {
+function ChapterState({ status, offline, idle, rereading }: { status?: string; offline?: boolean; idle?: string; rereading?: boolean }) {
+  if (rereading) return <span className="trail meta-row"><span className="spinner" />Reading again</span>;
   if (offline) return <span className="trail label-ok">On phone</span>;
   if (status === 'ready') return <span className="trail">Ready</span>;
   if (status === 'error') return <span className="trail label-bad">Error</span>;
@@ -345,13 +346,14 @@ function LocalDetail({ mangaKey, online }: { mangaKey: string; online: boolean }
     }
   }
 
-  const chapters: { key: string; name: string; order: number; status?: string; detail?: string; readAt?: string }[] = serverChapters
+  const chapters: { key: string; name: string; order: number; status?: string; detail?: string; readAt?: string; rereading?: boolean }[] = serverChapters
     ? serverChapters.map((c) => ({
         key: c.key,
         name: c.name,
         order: c.order,
         status: c.status,
         readAt: c.readAt,
+        rereading: c.rereading,
         detail:
           c.status === 'downloading' || c.status === 'ocr'
             ? `${c.status === 'ocr' ? 'reading text' : 'downloading'} ${c.pagesDone}/${c.pageCount}`
@@ -436,6 +438,14 @@ function LocalDetail({ mangaKey, online }: { mangaKey: string; online: boolean }
         )}
       </div>
       {!chapters.length && <p className="footnote">Preparing the first chapters on the laptop…</p>}
+      {editing && (
+        <div className="group">
+          <button className="list-item action-row" disabled={acting === 'reread'} onClick={() => act('reread', () => mangaApi.rereadManga(mangaKey))}>
+            <span className="grow">Read the text of all chapters again</span>
+          </button>
+        </div>
+      )}
+      {editing && <p className="footnote">For chapters prepared by an older Horu. About five minutes per chapter on the laptop; you can keep reading meanwhile. Corrections you made by hand stay.</p>}
       {online && active + paused > 1 && (
         <div className="group">
           <div className="cell">
@@ -467,7 +477,7 @@ function LocalDetail({ mangaKey, online }: { mangaKey: string; online: boolean }
               return (
                 <button key={c.key} className="list-item" disabled={!readable} onClick={() => navigate(`manga/read/${c.key}`)}>
                   {label}
-                  <ChapterState status={c.status} offline={onPhone} />
+                  <ChapterState status={c.status} offline={onPhone} rereading={c.rereading} />
                   {readable && <Icon name="chevron" size={18} weight={2} className="chev" />}
                 </button>
               );
@@ -501,6 +511,9 @@ function LocalDetail({ mangaKey, online }: { mangaKey: string; online: boolean }
                         Off phone
                       </button>
                     )}
+                    <button className="small" disabled={c.rereading} onClick={() => act(c.key, () => mangaApi.rereadChapter(c.key))}>
+                      {c.rereading ? 'Reading again' : 'Read text again'}
+                    </button>
                     <button
                       className="small danger"
                       onClick={() => confirm(`Delete “${c.name}”? Its pages are removed from the laptop and this phone.`) && act(c.key, () => mangaApi.stopChapter(c.key, 'cancel'))}

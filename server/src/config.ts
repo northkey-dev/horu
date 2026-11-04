@@ -52,6 +52,7 @@ const DEFAULT_SETTINGS: Settings = {
   autoMatchWhisper: !process.env.HORU_DOCKER,
   kanjiCards: false,
   animeScreenshot: false,
+  voiceCards: true,
   keepDays: 7,
   dailyGoalXp: 40,
   reminderEnabled: false,

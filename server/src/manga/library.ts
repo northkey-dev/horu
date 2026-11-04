@@ -41,6 +41,8 @@ export type PreparedChapter = {
   readAt?: string;
   /** Text language checked after OCR; true = Chinese */
   chinese?: boolean;
+  /** The text recognition runs again; the chapter stays readable meanwhile */
+  rereading?: boolean;
 };
 
 export type PageBlock = { box: [number, number, number, number]; vertical: boolean; text: string };

@@ -126,6 +126,8 @@ export type Settings = {
   kanjiCards: boolean;
   /** Put the video frame on anime cards (manga cards always get their panel). */
   animeScreenshot: boolean;
+  /** A computer voice on cards without sound (server/src/tts.ts) */
+  voiceCards: boolean;
   /** Days that audio/images of finished or discarded moments stay available for "restore". */
   keepDays: number;
   /** Daily goal in XP (see analytics.ts for how XP is earned). */

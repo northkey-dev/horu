@@ -30,6 +30,7 @@ Horu is a web app for your phone (it installs to the home screen). It runs on it
 - On any web page: the Chrome extension underlines words you don't know yet, shows the dictionary on hover and sends the sentence to your inbox.
 
 **Cards**
+- Cards without sound (manga, text, photos) get a computer voice reading the sentence, made on your own computer at no cost (module `tts`, Settings → *Voice on cards without sound*). It can misread a word: the furigana on the card count.
 - Anki through AnkiConnect (desktop, or AnkiConnect Android), or an `.apkg` file built right on the phone (with audio and picture) for AnkiMobile/AnkiDroid, or AnkiMobile's add-note link, or CSV/JSON. Optionally also jpdb.io.
 - Explanations from Claude Code (your subscription), Gemini (free API key), Anthropic or OpenAI keys, Ollama on the laptop, or any chat app via "copy prompt / paste answer". Or none.
 
@@ -79,6 +80,7 @@ The installer asks which modules you want:
 | core | the service, Chrome extension, tray launcher | Node.js |
 | whisper | transcription for marks without subtitles | Python, ~1.5 GB model on first use |
 | manga | Suwayomi (manga sources), mokuro (text recognition) and EasyOCR's text detector for photos | Python; mokuro brings PyTorch (1–2 GB); Java 21 on macOS/Linux; ~80 MB more for the photo detector |
+| tts | a computer voice for cards without sound (manga, text, photos) | Python, ~120 MB |
 | claude | card explanations with Claude Code | a Claude subscription |
 | ollama | card explanations with a local model | a decent CPU/GPU |
 
@@ -159,6 +161,7 @@ Good to know:
 - **Tap a speech bubble** to open it. Then:
   - words you do not know yet are **underlined** (strongly for new, faintly for words you are learning), like in the text reader;
   - tap a word for the dictionary (JMdict and your Yomitan dictionaries, frequency, pitch accent) and set how well you know it. Under the entry the word's **kanji** are listed one by one with meaning and readings. If a word is not in the dictionary (a name, a rare word or an OCR error), the kanji list is what you get. **Mine with this word** in that dictionary entry sends the line to your inbox with the word already chosen, so you only confirm the card;
+  - **Furigana** next to a line is left out of the text. In rare cases it still slips in when it touches the main text; then use *Fix the text*.
   - **Fix the text** lets you correct what the text recognition got wrong (it is not perfect, especially with unusual fonts). The correction is kept for that bubble, and is what Translate and Mine use. *Back to the recognised text* undoes it;
   - **Show furigana** adds readings above the words (a faint reading is a guess from the kanji dictionary);
   - **Translate** translates the whole bubble into English, with the previous bubbles as context, and a note on what a learner would miss. The translation starts in the background when you open the bubble, so the answer is often there when you press (*Translate ahead* under Settings → This phone; it costs one AI request per bubble you open, switch it off if your AI is paid per use). It uses the AI from Settings (the laptop's, or your key on the phone); without one, the prompt is copied so you can paste it into any chat app;
@@ -181,6 +184,7 @@ Open a manga from the library to see its chapters. States: *Queued*, *Loading* (
 | Read it without waiting, or without the laptop | **Save on phone** next to a ready chapter. Its pages are stored on the phone and open instantly. |
 | Free the phone's space | **Edit**, then **Off phone** (the chapter stays on the laptop) |
 | Save everything you read onto the phone | **Read → Sync** (the *On this phone* box). **Stop** ends it; what was saved stays. |
+| Run the text recognition again (for chapters from an older Horu) | **Edit**, then **Read text again** on a chapter, or **Read the text of all chapters again**. About five minutes per chapter; the chapter stays readable, and a phone fetches the new text with its next sync. |
 | Stop preparing new chapters of a manga | **Mark as paused** (and *Mark as reading* to continue) |
 | Remove a manga | **Remove** at the bottom of its page |
 | Mark a chapter read (or unread) | **Edit**, then **Mark read** / **Mark unread**. Read chapters are cleaned up after the days set in Settings. |
@@ -399,7 +403,7 @@ Run them in their own compose files; they do not need to know about Horu. Home A
 | Variable (`.env`) | Meaning |
 |---|---|
 | `TS_AUTHKEY`, `TS_HOSTNAME` | Tailscale key, and the name of the machine on your tailnet (default `horu`) |
-| `HORU_MODULES` | `manga`, `whisper`, `manga,whisper`, or empty (only when building) |
+| `HORU_MODULES` | Any of `manga`, `whisper`, `tts`, comma separated, or empty (only when building) |
 | `HORU_VERSION` | Image version to run (default `latest`) |
 | `HORU_ANKI_URL` | AnkiConnect address of Anki on another computer |
 | `HORU_PORT`, `HORU_LAN_ADDRESS` | Home-network variant: the port and the Pi's address shown on the pairing page |
