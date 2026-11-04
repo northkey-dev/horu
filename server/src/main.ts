@@ -1,11 +1,11 @@
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import express from 'express';
+import express, { type NextFunction, type Request, type Response } from 'express';
 import { WebSocketServer } from 'ws';
 import { zipSync } from 'fflate';
 import { ACCESS_TOKEN, PORT, PWA_DIST, ROOT_DIR, VERSION, getSettings } from './config.ts';
-import { crossOrigin, hasToken, isTrustedNetwork, localOrToken, requireAccess } from './auth.ts';
+import { EXTENSION_ORIGIN, crossOrigin, guardHost, hasToken, isLoopback, knownHost, localOrToken, requireAccess } from './auth.ts';
 import { attachExtension } from './extensionHub.ts';
 import { ensureDictionary, lookupIndex } from './dict.ts';
 import { ensureKanjidic } from './kanji.ts';
@@ -27,6 +27,7 @@ import { refreshFromAnki, refreshServices } from './knownWords.ts';
 const app = express();
 app.disable('x-powered-by');
 
+app.use(guardHost);
 app.use(crossOrigin);
 app.get('/pair', localOrToken, pairPage);
 
@@ -59,7 +60,7 @@ app.use('/dict', dictRouter());
 // A phone on the home Wi-Fi (no Tailscale) opens the app from this laptop with the access token once. The home
 // screen app has its own cookies on iOS, so its start address carries the token.
 app.get('/manifest.webmanifest', (req, res, next) => {
-  if (isTrustedNetwork(req)) return next();
+  if (isLoopback(req)) return next();
   try {
     const manifest = JSON.parse(fs.readFileSync(path.join(PWA_DIST, 'manifest.webmanifest'), 'utf8')) as Record<string, unknown>;
     res.type('application/manifest+json').setHeader('Cache-Control', 'no-cache').send(JSON.stringify({ ...manifest, start_url: `./?t=${ACCESS_TOKEN}` }));
@@ -83,14 +84,21 @@ app.get('*', (_req, res) => {
   else res.status(503).type('text').send('PWA not built yet: run `npm run build`.');
 });
 
+// Errors outside the JSON handlers (a refused id, a body that is too large): a short answer, no stack trace.
+app.use((err: Error & { status?: number }, _req: Request, res: Response, _next: NextFunction) => {
+  res.status(err.status ?? 400).json({ error: err.message });
+});
+
 const server = http.createServer(app);
 const wss = new WebSocketServer({ noServer: true });
 server.on('upgrade', (req, socket, head) => {
   const ip = req.socket.remoteAddress ?? '';
   const local = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
   const url = new URL(req.url ?? '/', 'http://horu');
-  // The extension on this computer, or from another one (Horu on a Raspberry Pi) with the access token.
-  if (url.pathname !== '/ws/ext' || !(local || hasToken({ headers: req.headers, query: Object.fromEntries(url.searchParams) }))) return socket.destroy();
+  // The extension on this computer, or from another one (Horu on a Raspberry Pi) with the access token. WebSockets
+  // are open to every website, so the origin has to be the extension itself.
+  if (url.pathname !== '/ws/ext' || !knownHost(req.headers.host) || req.headers.origin !== EXTENSION_ORIGIN) return socket.destroy();
+  if (!(local || hasToken({ headers: req.headers, query: Object.fromEntries(url.searchParams) }))) return socket.destroy();
   wss.handleUpgrade(req, socket, head, (ws) => attachExtension(ws));
 });
 

@@ -91,10 +91,26 @@ export function getSettings(): Settings {
   return settings;
 }
 
+/** Settings that are passwords: they never leave the laptop in full, not to the app and not to the cloud backup. */
+export const SECRET_SETTINGS = ['jimakuApiKey', 'aiApiKey', 'jpdbApiKey', 'wanikaniToken', 'anilistToken', 'playerToken', 'mangaServerKey'] as const;
+const MASK = '••••';
+
+/** The settings as the app sees them. A long key keeps its last four characters, so you can tell which one is set. */
+export function maskedSettings(): Settings {
+  const shown = { ...settings };
+  for (const key of SECRET_SETTINGS) {
+    const value = settings[key];
+    if (value) shown[key] = MASK + (value.length >= 12 ? value.slice(-4) : '');
+  }
+  return shown;
+}
+
 export function updateSettings(patch: Partial<Settings>): Settings {
   const allowed = Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[];
   const clean: Partial<Settings> = {};
   for (const key of allowed) {
+    // The app sends back what it was shown: a masked key means "unchanged".
+    if ((SECRET_SETTINGS as readonly string[]).includes(key) && String(patch[key] ?? '').startsWith(MASK)) continue;
     if (key in patch && typeof patch[key] === typeof DEFAULT_SETTINGS[key]) {
       (clean as Record<string, unknown>)[key] = patch[key];
     }
@@ -115,6 +131,12 @@ export const ACCESS_TOKEN: string = (() => {
     return token;
   }
 })();
+
+/** Ids become file and folder names, so a request must not be able to walk out of the data folder with one. */
+export function safeId(id: string): string {
+  if (typeof id !== 'string' || !/^[\w-]{1,120}$/.test(id)) throw new Error('Invalid id');
+  return id;
+}
 
 export function writeJsonAtomic(file: string, value: unknown): void {
   const tmp = `${file}.${process.pid}.tmp`;

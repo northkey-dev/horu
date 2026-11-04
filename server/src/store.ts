@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { DATA_DIR, MEDIA_DIR, SUBS_DIR, writeJsonAtomic } from './config.ts';
+import { DATA_DIR, MEDIA_DIR, SUBS_DIR, safeId, writeJsonAtomic } from './config.ts';
 import type { Cue, Moment, Session } from '../../shared/types.ts';
 
 // A tiny JSON-file store. Single user, a few thousand records at most.
@@ -41,6 +41,7 @@ export function newId(): string {
 }
 
 export function addMoment(moment: Moment): Moment {
+  safeId(moment.id);
   db.moments.push(moment);
   save();
   return moment;
@@ -119,27 +120,31 @@ export function inboxMoments(): Moment[] {
 }
 
 export function mediaPath(id: string, ext: string): string {
-  return path.join(MEDIA_DIR, `${id}.${ext}`);
+  return path.join(MEDIA_DIR, `${safeId(id)}.${ext}`);
 }
 
 // ---- sessions ----
 
+const subsFile = (id: string) => path.join(SUBS_DIR, `${safeId(id)}.json`);
+
 export function addSession(session: Session, cues: Cue[]): Session {
+  const file = subsFile(session.id);
   db.sessions.push(session);
   db.activeSessionId = session.id;
   if (session.jimakuEntryId) db.lastEpisode[String(session.jimakuEntryId)] = session.episode;
-  writeJsonAtomic(path.join(SUBS_DIR, `${session.id}.json`), cues);
+  writeJsonAtomic(file, cues);
   save();
   return session;
 }
 
 /** A session the phone ran on its own. Stored like any other but not made active; the phone's watch time wins. */
 export function importSession(session: Session, cues: Cue[] | undefined): void {
+  const file = subsFile(session.id);
   const existing = getSession(session.id);
   if (existing) Object.assign(existing, session);
   else db.sessions.push(session);
   if (session.jimakuEntryId) db.lastEpisode[String(session.jimakuEntryId)] = Math.max(db.lastEpisode[String(session.jimakuEntryId)] ?? 0, session.episode);
-  if (cues) writeJsonAtomic(path.join(SUBS_DIR, `${session.id}.json`), cues);
+  if (cues) writeJsonAtomic(file, cues);
   save();
 }
 
@@ -158,7 +163,7 @@ export function updateSessionCues(id: string, cues: Cue[], subtitleName?: string
   if (!session) return;
   session.cueCount = cues.length;
   session.subtitleName = subtitleName;
-  writeJsonAtomic(path.join(SUBS_DIR, `${id}.json`), cues);
+  writeJsonAtomic(subsFile(id), cues);
   save();
 }
 
@@ -177,7 +182,7 @@ export function endSession(): void {
 
 export function sessionCues(id: string): Cue[] {
   try {
-    return JSON.parse(fs.readFileSync(path.join(SUBS_DIR, `${id}.json`), 'utf8'));
+    return JSON.parse(fs.readFileSync(subsFile(id), 'utf8'));
   } catch {
     return [];
   }

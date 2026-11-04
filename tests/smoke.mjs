@@ -3,6 +3,8 @@
 //   npm run smoke
 import { spawn } from 'node:child_process';
 import http from 'node:http';
+import { zipSync } from 'fflate';
+import { WebSocket } from 'ws';
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
@@ -62,6 +64,17 @@ const call = async (method, url, body) => {
   }
   return { status: res.status, json };
 };
+
+/** fetch() may not set the Host header, the security checks need it. */
+const raw = (method, url, headers = {}) =>
+  new Promise((resolve, reject) => {
+    const req = http.request({ host: '127.0.0.1', port: PORT, method, path: url, headers }, (res) => {
+      let body = '';
+      res.setEncoding('latin1').on('data', (d) => (body += d)).on('end', () => resolve({ status: res.statusCode, body }));
+    });
+    req.on('error', reject);
+    req.end();
+  });
 
 let failed = 0;
 async function check(name, fn) {
@@ -203,6 +216,87 @@ try {
     assert.equal(renamed.session.episode, 9);
     assert.equal(renamed.session.cueCount, 2);
     assert.equal(renamed.session.title, "Frieren: Beyond Journey's End");
+  });
+
+  await check('security: only own server names are answered (DNS rebinding)', async () => {
+    for (const host of ['evil.example', 'evil.example:7399', 'localhost.evil.example', '127.0.0.1.evil.example', 'evil.ts.net.example']) {
+      assert.equal((await raw('GET', '/api/settings', { Host: host })).status, 403, host);
+    }
+    for (const host of ['localhost', '127.0.0.1:7399', '[::1]:7399', '192.168.1.5:7399', '100.101.102.103', 'horu.tail1234.ts.net', 'horu-pi', 'horu-pi.local:7399', 'laptop.fritz.box']) {
+      assert.equal((await raw('GET', '/api/status', { Host: host })).status, 200, host);
+    }
+  });
+
+  await check('security: no key leaves the laptop through the settings', async () => {
+    const keys = { aiApiKey: 'sk-very-long-secret-1234', wanikaniToken: 'wk-very-long-secret-5678', anilistToken: 'short', playerToken: 'user:pass' };
+    await call('PUT', '/api/settings', keys);
+    const { json: s } = await call('GET', '/api/settings');
+    assert.equal(s.aiApiKey, '••••1234');
+    assert.equal(s.wanikaniToken, '••••5678');
+    assert.equal(s.anilistToken, '••••', 'a short key shows nothing of itself');
+    assert.equal(s.playerToken, '••••');
+    assert.ok(!JSON.stringify(s).includes('secret'));
+    // Sending back what the app was shown changes nothing; a new key does.
+    await call('PUT', '/api/settings', s);
+    assert.equal((await call('GET', '/api/settings')).json.aiApiKey, '••••1234');
+    await call('PUT', '/api/settings', { aiApiKey: 'sk-another-long-secret-9999' });
+    assert.equal((await call('GET', '/api/settings')).json.aiApiKey, '••••9999');
+    await call('PUT', '/api/settings', { aiApiKey: '', wanikaniToken: '', anilistToken: '', playerToken: '' });
+    assert.equal((await call('GET', '/api/settings')).json.aiApiKey, '');
+  });
+
+  await check('security: websites cannot act, the app and the extension can', async () => {
+    const post = (origin) => raw('POST', '/api/sessions/end', origin ? { Origin: origin } : {});
+    assert.equal((await post('https://evil.example')).status, 403);
+    assert.equal((await post('null')).status, 403, 'sandboxed iframe');
+    assert.equal((await post('chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')).status, 403, 'another extension');
+    assert.equal((await post('chrome-extension://mndgnojkakdnnkkjenpokckpjbpgdjpg')).status, 200);
+    assert.equal((await post(`http://127.0.0.1:${PORT}`)).status, 200, 'the app served by this laptop');
+    assert.equal((await post()).status, 200, 'a Shortcut sends no origin');
+    assert.equal((await raw('GET', '/api/status', { Origin: 'null' })).status, 200);
+  });
+
+  await check('security: the extension socket is for the extension', async () => {
+    const open = (origin) =>
+      new Promise((resolve) => {
+        const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws/ext`, origin ? { headers: { Origin: origin } } : {});
+        ws.on('open', () => (ws.close(), resolve(true)));
+        ws.on('error', () => resolve(false));
+      });
+    assert.equal(await open('https://evil.example'), false);
+    assert.equal(await open(undefined), false);
+    assert.equal(await open('chrome-extension://mndgnojkakdnnkkjenpokckpjbpgdjpg'), true);
+  });
+
+  await check('security: ids cannot leave the data folder', async () => {
+    const outside = path.join(root, 'smoke-outside');
+    fs.mkdirSync(path.join(outside, 'keep'), { recursive: true });
+    fs.writeFileSync(path.join(outside, 'private.jpg'), 'PRIVATE');
+    fs.writeFileSync(path.join(outside, 'keep', 'file.txt'), 'keep');
+    const up = '..%2F..%2Fsmoke-outside';
+    try {
+      for (const url of [`/api/moments/${up}%2Fprivate/image`, `/api/manga/files/${up}/private.jpg`, `/api/manga/thumb/${up}%2Fprivate`]) {
+        const res = await raw('GET', url);
+        assert.ok(res.status >= 400 && !res.body.includes('PRIVATE'), `${url} -> ${res.status}`);
+      }
+      const session = { id: '../../smoke-outside/written', title: 'x', createdAt: new Date().toISOString(), episode: 1, cueCount: 0 };
+      assert.equal((await call('POST', '/api/sessions/import', { session, cues: [] })).status, 400);
+      assert.equal(fs.existsSync(path.join(outside, 'written.json')), false);
+      assert.equal((await call('POST', '/api/moments/import', { moment: { id: '../../smoke-outside/m', kind: 'text', candidates: [] }, audio: 'AAAA' })).status, 400);
+      assert.equal(fs.existsSync(path.join(outside, 'm.wav')), false);
+      // A manga has to exist for the chapter route to go on.
+      const zip = zipSync({ 'a/001.jpg': new Uint8Array([255, 216, 255, 217]) });
+      const manga = await fetch(`${base}/api/manga/import`, { method: 'POST', headers: { 'X-Filename': 'x.cbz', 'Content-Type': 'application/octet-stream' }, body: zip }).then((r) => r.json());
+      const bad = `/api/manga/chapters/${up}%2Fkeep`;
+      assert.equal((await call('POST', `${bad}/prepare`, { mangaKey: manga.key, name: 'x' })).status, 400);
+      await call('POST', `${bad}/cancel`, {});
+      assert.equal(fs.existsSync(path.join(outside, 'keep', 'file.txt')), true, 'folder was deleted');
+      // Normal ids still work.
+      assert.equal((await call('GET', `/api/manga/library/${manga.key}/chapters`)).status, 200);
+      assert.equal((await call('POST', '/api/sessions/import', { session: { ...session, id: 'phabc123' }, cues: [] })).status, 200);
+    } finally {
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
   });
 
   await check('pwa shell is served', async () => {

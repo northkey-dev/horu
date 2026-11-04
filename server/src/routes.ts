@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import QRCode from 'qrcode';
 import http from 'node:http';
-import { ACCESS_TOKEN, APP_URL, PORT, ROOT_DIR, VERSION, getSettings, updateSettings } from './config.ts';
+import { ACCESS_TOKEN, APP_URL, PORT, ROOT_DIR, VERSION, getSettings, maskedSettings, updateSettings } from './config.ts';
 import os from 'node:os';
 import { ankiOnline, isAnkiStarting, noteTypeId } from './anki.ts';
 import { notify } from './webhook.ts';
@@ -133,16 +133,11 @@ export function apiRouter(): express.Router {
     }),
   );
 
-  r.get(
-    '/settings',
-    h(() => ({ ...getSettings(), jimakuApiKey: getSettings().jimakuApiKey ? '••••' + getSettings().jimakuApiKey.slice(-4) : '' })),
-  );
+  r.get('/settings', h(() => maskedSettings()));
   r.put(
     '/settings',
     h((req) => {
-      const patch = req.body as Partial<Settings>;
-      if (patch.jimakuApiKey?.startsWith('••••')) delete patch.jimakuApiKey;
-      updateSettings(patch);
+      updateSettings(req.body as Partial<Settings>);
       return { ok: true };
     }),
   );

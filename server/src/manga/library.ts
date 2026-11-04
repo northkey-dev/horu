@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { DATA_DIR, MANGA_DIR, writeJsonAtomic } from '../config.ts';
+import { DATA_DIR, MANGA_DIR, safeId, writeJsonAtomic } from '../config.ts';
 
 // Horu's own manga state: which manga are being read, reading progress and the
 // chapters prepared (downloaded + OCR'd) for offline reading on the phone.
@@ -66,8 +66,8 @@ function save(): void {
   timer = setTimeout(() => writeJsonAtomic(FILE, db), 200);
 }
 
-export const chapterDir = (key: string) => path.join(MANGA_DIR, key);
-export const thumbPath = (key: string) => path.join(THUMB_DIR, `${key}.jpg`);
+export const chapterDir = (key: string) => path.join(MANGA_DIR, safeId(key));
+export const thumbPath = (key: string) => path.join(THUMB_DIR, `${safeId(key)}.jpg`);
 
 export function listManga(): ActiveManga[] {
   return db.manga;
@@ -78,6 +78,7 @@ export function getManga(key: string): ActiveManga | undefined {
 }
 
 export function upsertManga(m: ActiveManga): ActiveManga {
+  safeId(m.key);
   const existing = getManga(m.key);
   if (existing) Object.assign(existing, m);
   else db.manga.push(m);
@@ -108,6 +109,7 @@ export function getChapter(key: string): PreparedChapter | undefined {
 }
 
 export function upsertChapter(c: PreparedChapter): PreparedChapter {
+  safeId(c.key);
   const existing = getChapter(c.key);
   if (existing) Object.assign(existing, c);
   else db.chapters.push(c);

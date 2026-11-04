@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, flushOutbox } from './lib/api.ts';
 import { flash, navigate, useEventTick, usePoll, useRoute } from './lib/hooks.ts';
 import { currentSession, pendingPhone, setAnilistToken, syncPhone } from './lib/phone.ts';
-import { hasLaptop, parseLaptop, setLaptop } from './lib/laptop.ts';
+import { hasLaptop, laptopBase, parseLaptop, setLaptop } from './lib/laptop.ts';
 import { preloadJapanese } from './lib/japanese.ts';
 import { learnFromLaptop, queuedCount } from './lib/cards.ts';
 import { Icon } from './components/Icon.tsx';
@@ -61,9 +61,13 @@ export function App() {
     const m = /^#\/pair\?(.*)$/.exec(location.hash);
     if (!m) return;
     const url = parseLaptop(m[1]);
-    if (url) setLaptop(url);
     navigate('settings');
-    flash(url ? 'Laptop connected' : 'That link has no laptop address');
+    if (!url) return flash('That link has no laptop address');
+    // A link can come from anywhere, and whatever it names would get your marks and keys.
+    if (url === laptopBase()) return flash('Laptop connected');
+    if (!confirm(`Connect Horu to ${new URL(url).host}?\n\nOnly say yes if you just scanned this code on your own laptop.`)) return;
+    setLaptop(url);
+    flash('Laptop connected');
   }, [route]);
 
   useEffect(() => {

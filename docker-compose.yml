@@ -35,6 +35,7 @@ services:
       HORU_LAN_ADDRESS: ${HORU_LAN_ADDRESS:-}
       HORU_ANKI_URL: ${HORU_ANKI_URL:-}
       HORU_APP_URL: ${HORU_APP_URL:-}
+      HORU_ALLOWED_HOSTS: ${HORU_ALLOWED_HOSTS:-}
       TS_SOCKET: /var/run/tailscale/tailscaled.sock
     volumes:
       - ./data:/data

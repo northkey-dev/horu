@@ -403,6 +403,7 @@ Run them in their own compose files; they do not need to know about Horu. Home A
 | `HORU_VERSION` | Image version to run (default `latest`) |
 | `HORU_ANKI_URL` | AnkiConnect address of Anki on another computer |
 | `HORU_PORT`, `HORU_LAN_ADDRESS` | Home-network variant: the port and the Pi's address shown on the pairing page |
+| `HORU_ALLOWED_HOSTS` | Names of your own for a reverse proxy or domain, comma separated. Addresses, names without a dot, `*.ts.net`, `*.local`, `*.lan`, `*.internal`, `*.home.arpa` and `*.fritz.box` always work; every other name is refused so that no website can pose as this computer. |
 | `PUID`, `PGID`, `TZ` | Your user id (so `data/` belongs to you) and time zone |
 
 ### If something is wrong
@@ -534,7 +535,8 @@ Horu ships no anime, manga, subtitles, audio or lists of sources. It works on wh
 ## Privacy
 
 - No account, no server of ours, no central site, no analytics. The app is static files that you serve yourself (from your laptop or Pi, or from your own GitHub Pages); your data lives on your phone and your laptop.
-- The laptop only answers the app, your Tailscale network and its own Chrome extension.
+- The laptop only answers the app, your Tailscale network (through `tailscale serve`) and its own Chrome extension. Everything else needs the access token, also a plain `http://100.x.y.z:7317` address.
+- API keys you saved on the laptop stay there: the app only sees their last four characters. The Jimaku key is the exception, a connected phone gets it so it can load subtitles itself.
 - While you record a tab, the extension sends the words of that page that name the show (tab title, headings, address words; not the site name or the query) to your own laptop, and only there.
 - API keys you enter stay on the device where you enter them (phone keys never go to the laptop). The optional extra backup copy leaves keys out.
 - Calls go only to the services you set up: Jimaku, AnkiConnect, your AI service, AniList, jpdb, WaniKani, your media or manga server.

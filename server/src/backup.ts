@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import express, { type Request, type Response } from 'express';
-import { DATA_DIR, getSettings } from './config.ts';
+import { DATA_DIR, SECRET_SETTINGS, getSettings } from './config.ts';
 import { dayKey } from './analytics.ts';
 import { log } from './log.ts';
 import { flush } from './store.ts';
@@ -22,7 +22,7 @@ function copyInto(target: string, withSecrets: boolean): void {
     const from = path.join(DATA_DIR, f);
     if (!fs.existsSync(from) || (!withSecrets && SECRET_FILES.has(f))) continue;
     if (!withSecrets && f === 'settings.json') {
-      fs.writeFileSync(path.join(target, f), JSON.stringify({ ...JSON.parse(fs.readFileSync(from, 'utf8')), jimakuApiKey: '', aiApiKey: '', jpdbApiKey: '', wanikaniToken: '', anilistToken: '', playerToken: '', mangaServerKey: '' }, null, 2));
+      fs.writeFileSync(path.join(target, f), JSON.stringify({ ...JSON.parse(fs.readFileSync(from, 'utf8')), ...Object.fromEntries(SECRET_SETTINGS.map((k) => [k, ''])) }, null, 2));
     } else fs.copyFileSync(from, path.join(target, f));
   }
   for (const d of SUBFOLDERS) {
