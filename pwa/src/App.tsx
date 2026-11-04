@@ -84,7 +84,11 @@ export function App() {
   useEventTick('horu-cards');
 
   const [page = 'watch', arg] = route;
-  const offline = Boolean(error);
+  // One missed check is not "away": over a relayed Tailscale link, or while the phone wakes its VPN, a single
+  // poll can fail. Only two misses in a row count.
+  const [misses, setMisses] = useState(0);
+  useEffect(() => setMisses((m) => (error ? m + 1 : 0)), [error]);
+  const offline = misses >= 2;
   const paired = hasLaptop();
   const inboxCount = (status?.inboxCount ?? 0) + pendingPhone();
 
