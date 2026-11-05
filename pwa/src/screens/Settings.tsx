@@ -20,7 +20,7 @@ import type { Settings as S, Status } from '../../../shared/types.ts';
 
 const MPV_PIPE = String.raw`\\.\pipe\mpvsocket`;
 
-type Toggle = 'jlptBaseline' | 'autoMatchWhisper' | 'kanjiCards' | 'animeScreenshot' | 'voiceCards' | 'reminderEnabled' | 'prepBeforeWatch' | 'prepBeforeRead' | 'showAdultSources';
+type Toggle = 'jlptBaseline' | 'autoMatchWhisper' | 'kanjiCards' | 'animeScreenshot' | 'voiceCards' | 'voiceOnline' | 'reminderEnabled' | 'prepBeforeWatch' | 'prepBeforeRead' | 'showAdultSources';
 
 export function Settings({ status }: { status?: Status }) {
   const [s, setS] = useState<S>();
@@ -293,6 +293,7 @@ export function Settings({ status }: { status?: Status }) {
             </label>
             {toggle('animeScreenshot', 'Screenshot on anime cards', 'Off: anime cards only get sentence and audio. Manga cards always get their panel.')}
             {modules?.voice && toggle('voiceCards', 'Voice on cards without sound', 'Manga, text and photo cards get a computer voice reading the sentence. It runs on the laptop and costs nothing. It can misread a word: the furigana on the card count.')}
+            {modules?.voice && toggle('voiceOnline', 'Natural voice for Listen', 'The Listen buttons in the reader use the neural Japanese voice of Microsoft Edge (free, needs internet on the laptop). The sentence is sent to Microsoft for that. Off: the voice of this computer (Kokoro) or the phone.')}
             {toggle('kanjiCards', 'Kanji cards', 'Also add one card per new kanji of a target word (subdeck “::Kanji”).')}
           </div>
 

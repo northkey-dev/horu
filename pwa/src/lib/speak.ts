@@ -1,6 +1,7 @@
-// Reading Japanese aloud. First choice is the voice of the phone or browser: instant, free, works without the laptop.
-// A device without a Japanese voice (a Windows PC usually has none) or one that stays silent gets the laptop's voice
-// instead (Kokoro, the one on the cards). Started from a tap, which iOS requires.
+// Reading Japanese aloud. First choice is the laptop's voice (the neural voice of Microsoft Edge, else Kokoro): it sounds
+// far better than the Japanese voice a phone ships with. It is fetched in advance (`prefetchVoice`, when the sheet with the
+// text opens), so a tap plays it at once, which iOS requires of a sound: it starts from a tap, not seconds later.
+// Without the laptop (away from home, no voice installed) the voice of the phone or browser reads.
 
 import type { Printed } from '../../../shared/readings.ts';
 import { laptopUp } from './api.ts';
@@ -37,8 +38,61 @@ function silence(): string {
   return URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' }));
 }
 
+// ---- the laptop's voice, fetched in advance
+
+const MAX_KEPT = 40;
+const ready = new Map<string, string>(); // text -> object URL of its audio, oldest first
+const fetching = new Map<string, Promise<string | undefined>>();
+/** After "no voice there" the laptop is not asked again for a while */
+let offUntil = 0;
+
+const laptopOk = () => laptopUp() && Date.now() >= offUntil;
+
+function fetchVoice(text: string, readings?: Printed[]): Promise<string | undefined> {
+  const known = fetching.get(text);
+  if (known) return known;
+  const job = (async () => {
+    try {
+      const res = await fetch(laptopUrl('/api/tts'), {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, readings, listen: true }),
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (res.status === 404) {
+        offUntil = Date.now() + 5 * 60_000;
+        return undefined;
+      }
+      if (!res.ok) return undefined;
+      const url = URL.createObjectURL(await res.blob());
+      ready.set(text, url);
+      if (ready.size > MAX_KEPT) {
+        const [oldest] = ready.keys();
+        URL.revokeObjectURL(ready.get(oldest)!);
+        ready.delete(oldest);
+      }
+      return url;
+    } catch {
+      return undefined;
+    } finally {
+      fetching.delete(text);
+    }
+  })();
+  fetching.set(text, job);
+  return job;
+}
+
+/** Fetches the voice for `text` in the background, so reading it later starts at once. */
+export function prefetchVoice(text: string, readings?: Printed[]): void {
+  const t = text.trim();
+  if (t && laptopOk() && !ready.has(t)) void fetchVoice(t, readings);
+}
+
 // Kept in the open: a browser may drop an utterance nobody refers to while it is being read.
 let reading: SpeechSynthesisUtterance | undefined;
+
+const NO_VOICE = 'No Japanese voice on this device, and the laptop is not reachable. Install a Japanese voice in the device settings.';
 
 type Options = {
   /** Furigana the page prints, for the laptop's voice */
@@ -47,8 +101,9 @@ type Options = {
   done: (problem?: string) => void;
 };
 
-/** Reads `text`. Returns what stops it. */
-export function speak(text: string, { readings, done }: Options): () => void {
+/** Reads `text`. Returns what stops it. Call it from a tap. */
+export function speak(rawText: string, { readings, done }: Options): () => void {
+  const text = rawText.trim();
   let over = false;
   let stopNow: () => void = () => undefined;
   const finish = (problem?: string) => {
@@ -65,7 +120,7 @@ export function speak(text: string, { readings, done }: Options): () => void {
 
   // Inside the tap, before anything is waited for, and for the whole reading: a silent sound that plays all the
   // time. iOS then treats the page as one that plays audio, so the silent switch does not mute the voice, and it
-  // allows the laptop's voice to start when it is ready, which takes a few seconds, far longer than a tap is "fresh".
+  // keeps allowing the laptop's voice to start when it is ready.
   try {
     (navigator as Navigator & { audioSession?: { type: string } }).audioSession!.type = 'playback';
   } catch {
@@ -76,76 +131,67 @@ export function speak(text: string, { readings, done }: Options): () => void {
   audio.loop = true;
   void audio.play().catch(() => undefined);
 
-  async function withLaptop(): Promise<void> {
+  async function viaLaptop(fallback: (why: string) => void): Promise<void> {
     if (over) return;
-    if (!laptopUp()) return finish('No Japanese voice on this device, and the laptop is not reachable. Install a Japanese voice in the device settings.');
     try {
-      const res = await fetch(laptopUrl('/api/tts'), {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, readings }),
-        signal: AbortSignal.timeout(30_000),
-      });
+      // Prefetched: nothing is awaited, play() is still inside the tap.
+      const url = ready.get(text) ?? (await fetchVoice(text, readings));
       if (over) return;
-      if (res.status === 404) return finish('No Japanese voice here. Install one in the device settings, or switch on the voice module on the laptop.');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const url = URL.createObjectURL(await res.blob());
-      if (over) return URL.revokeObjectURL(url);
-      stopNow = () => {
-        audio.pause();
-        URL.revokeObjectURL(url);
-      };
-      audio.onended = () => {
-        URL.revokeObjectURL(url);
-        finish();
-      };
+      if (!url) return fallback(offUntil > Date.now() ? 'No voice on the laptop. Switch on the voice module there, or install a Japanese voice on this device.' : 'The laptop did not deliver the voice. Check that it is reachable.');
+      stopNow = () => audio.pause();
+      audio.onended = () => finish();
       audio.loop = false;
       audio.src = url;
       await audio.play();
     } catch (e) {
-      finish(`The voice could not be played (${(e as Error).name || 'error'}). Check that the laptop is reachable.`);
+      fallback(`The voice could not be played (${(e as Error).name || 'error'}).`);
     }
   }
 
-  const browserHasNone = canSpeak() && speechSynthesis.getVoices().length > 0 && !japaneseVoice();
-  if (!canSpeak() || browserHasNone) {
-    void withLaptop();
-    return stop;
+  const browserHasOne = () => canSpeak() && !(speechSynthesis.getVoices().length > 0 && !japaneseVoice());
+
+  function viaBrowser(fallback: () => void): void {
+    // Not cancelled when nothing is being read: some browsers lose a sound started right after a cancel.
+    if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'ja-JP';
+    utterance.rate = 0.9;
+    const voice = japaneseVoice();
+    if (voice) utterance.voice = voice;
+    reading = utterance;
+    let started = 0;
+    // A voice that never starts, or "reads" a sentence in a blink, is a voice that is not there.
+    const silent = setTimeout(() => {
+      if (started || over) return;
+      speechSynthesis.cancel();
+      fallback();
+    }, 3000);
+    utterance.onstart = () => (started = Date.now());
+    utterance.onend = () => {
+      clearTimeout(silent);
+      if (over) return;
+      if (started && Date.now() - started < 150 && text.length > 3) return fallback();
+      finish();
+    };
+    utterance.onerror = (e) => {
+      clearTimeout(silent);
+      if (over || e.error === 'canceled' || e.error === 'interrupted') return;
+      fallback();
+    };
+    stopNow = () => {
+      clearTimeout(silent);
+      if (reading === utterance) speechSynthesis.cancel();
+      audio.pause();
+    };
+    speechSynthesis.speak(utterance);
   }
 
-  // Not cancelled when nothing is being read: some browsers lose a sound started right after a cancel.
-  if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'ja-JP';
-  utterance.rate = 0.9;
-  const voice = japaneseVoice();
-  if (voice) utterance.voice = voice;
-  reading = utterance;
-  let started = 0;
-  // A voice that never starts, or "reads" a sentence in a blink, is a voice that is not there.
-  const silent = setTimeout(() => {
-    if (started || over) return;
-    speechSynthesis.cancel();
-    void withLaptop();
-  }, 3000);
-  utterance.onstart = () => (started = Date.now());
-  utterance.onend = () => {
-    clearTimeout(silent);
-    if (over) return;
-    if (started && Date.now() - started < 150 && text.length > 3) return void withLaptop();
-    finish();
-  };
-  utterance.onerror = (e) => {
-    clearTimeout(silent);
-    if (over || e.error === 'canceled' || e.error === 'interrupted') return;
-    void withLaptop();
-  };
-  stopNow = () => {
-    clearTimeout(silent);
-    if (reading === utterance) speechSynthesis.cancel();
-    audio.pause();
-  };
-  speechSynthesis.speak(utterance);
+  if (laptopOk()) {
+    void viaLaptop((why) => (browserHasOne() ? viaBrowser(() => finish(why)) : finish(why)));
+  } else if (browserHasOne()) {
+    viaBrowser(() => finish(NO_VOICE));
+  } else {
+    finish(NO_VOICE);
+  }
   return stop;
 }

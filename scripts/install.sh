@@ -113,7 +113,7 @@ fi
 
 if want tts; then
   step "tts: a computer voice for cards (Kokoro)"
-  pip_install 'kokoro-onnx==0.6.1' 'misaki[ja]==0.7.4' 'soundfile==0.14.0'
+  pip_install 'kokoro-onnx==0.6.1' 'misaki[ja]==0.7.4' 'soundfile==0.14.0' 'edge-tts==7.3.1'
   mkdir -p "$root/tools/tts"
   for entry in kokoro-v1.0.int8.onnx:6e742170d309016e5891a994e1ce1559c702a2ccd0075e67ef7157974f6406cb voices-v1.0.bin:bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d; do
     name="${entry%%:*}"

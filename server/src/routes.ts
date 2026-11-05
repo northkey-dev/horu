@@ -26,7 +26,7 @@ import { extensionState } from './extensionHub.ts';
 import { cuesFromUpload, listFiles, searchEntries } from './jimaku.ts';
 import { detectFromPage, startSessionFor, type StartBody } from './sessions.ts';
 import { setRecording } from './remoteStart.ts';
-import { speak, ttsInstalled, ttsOn } from './tts.ts';
+import { listen, listenOn, speak, ttsInstalled, ttsOn } from './tts.ts';
 import { asPrinted } from '../../shared/readings.ts';
 import { candidatesAt } from '../../shared/subtitles.ts';
 import { importPhoneMoment, markMoment, receiveCapture, refreshCandidates, runWhisper, undoLastMoment } from './moments.ts';
@@ -327,10 +327,12 @@ export function apiRouter(): express.Router {
   // A computer voice for a card the phone builds (Horu on a Raspberry Pi has no Anki, there the phone makes the cards).
   r.post('/tts', async (req, res) => {
     const text = String(req.body?.text ?? '').trim();
-    if (!text || !ttsOn()) return void res.status(404).end();
+    // `listen`: the Listen buttons (best voice, no matter whether cards get one); else a card's voice
+    const wanted = req.body?.listen === true;
+    if (!text || !(wanted ? listenOn() : ttsOn())) return void res.status(404).end();
     const mp3 = store.mediaPath(store.newId(), 'mp3');
     try {
-      await speak(text, mp3, asPrinted(req.body?.readings));
+      await (wanted ? listen : speak)(text, mp3, asPrinted(req.body?.readings));
       res.type('audio/mpeg').sendFile(mp3, () => store.removeFile(mp3));
     } catch (err) {
       res.status(400).json({ error: (err as Error).message });

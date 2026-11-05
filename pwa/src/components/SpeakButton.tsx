@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { speak } from '../lib/speak.ts';
+import { prefetchVoice, speak } from '../lib/speak.ts';
 import type { Printed } from '../../../shared/readings.ts';
 import { Icon } from './Icon.tsx';
 
@@ -12,6 +12,8 @@ export function SpeakButton({ text, readings, label, className = 'ghost small' }
   const [problem, setProblem] = useState<string>();
   const stop = useRef<() => void>(undefined);
   useEffect(() => () => stop.current?.(), []);
+  // The voice is fetched now, when the sheet with the text opens: a tap then plays it at once.
+  useEffect(() => prefetchVoice(text, readings), [text]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!problem) return;
     const t = setTimeout(() => setProblem(undefined), 5000);

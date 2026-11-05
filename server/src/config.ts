@@ -53,6 +53,7 @@ const DEFAULT_SETTINGS: Settings = {
   kanjiCards: false,
   animeScreenshot: false,
   voiceCards: true,
+  voiceOnline: true,
   keepDays: 7,
   dailyGoalXp: 40,
   reminderEnabled: false,

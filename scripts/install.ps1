@@ -127,7 +127,7 @@ if (& $want 'manga') {
 
 if (& $want 'tts') {
   Write-Host '== tts: a computer voice for cards (Kokoro)' -ForegroundColor Cyan
-  Pip @('kokoro-onnx==0.6.1', 'misaki[ja]==0.7.4', 'soundfile==0.14.0')
+  Pip @('kokoro-onnx==0.6.1', 'misaki[ja]==0.7.4', 'soundfile==0.14.0', 'edge-tts==7.3.1')
   $dir = Join-Path $root 'tools\tts'
   New-Item -ItemType Directory -Force $dir | Out-Null
   $files = @{

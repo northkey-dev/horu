@@ -70,7 +70,7 @@ RUN set -eux; \
     case ",$MODULES," in *,whisper,*) tools/.venv/bin/pip install --no-cache-dir 'faster-whisper==1.2.1';; esac; \
     case ",$MODULES," in *,tts,*) \
       [ -d tools/.venv ] || python3 -m venv tools/.venv; \
-      tools/.venv/bin/pip install --no-cache-dir 'kokoro-onnx==0.6.1' 'misaki[ja]==0.7.4' 'soundfile==0.14.0'; \
+      tools/.venv/bin/pip install --no-cache-dir 'kokoro-onnx==0.6.1' 'misaki[ja]==0.7.4' 'soundfile==0.14.0' 'edge-tts==7.3.1'; \
       mkdir -p tools/tts; \
       curl -fL https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.int8.onnx -o tools/tts/kokoro-v1.0.int8.onnx; \
       curl -fL https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin -o tools/tts/voices-v1.0.bin; \
