@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { TokenText } from './TokenText.tsx';
 import { Sheet } from './Sheet.tsx';
+import { SpeakButton } from './SpeakButton.tsx';
 import { translateAhead, translateLine } from '../lib/cards.ts';
 import type { Translation } from '../../../shared/ai.ts';
 import type { Printed } from '../../../shared/readings.ts';
@@ -58,7 +59,7 @@ export function TextSheet({ text, readings, edited, source, context, onEdit, onM
   return (
     <Sheet className="reader-sheet" onClose={onClose}>
       {draft === undefined ? (
-        <TokenText text={text} printed={readings} className="sentence" highlight pickLabel="Mine with this word" onPick={(l) => onMine(l.form)} />
+        <TokenText text={text} printed={readings} className="sentence" highlight pickLabel="Mine with this word" onPick={(l) => onMine(l.form)} onDismissAll={onClose} />
       ) : (
         <div>
           <textarea className="jp bubble-edit" rows={3} value={draft} autoFocus onChange={(e) => setDraft(e.target.value)} />
@@ -74,6 +75,7 @@ export function TextSheet({ text, readings, edited, source, context, onEdit, onM
       )}
       {draft === undefined && (
         <div className="row" style={{ gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+          <SpeakButton text={text} label="Listen" />
           <button className="ghost small" onClick={() => setDraft(text)}>
             Fix the text
           </button>

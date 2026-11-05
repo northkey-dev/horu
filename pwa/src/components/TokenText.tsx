@@ -18,6 +18,8 @@ type Props = {
   className?: string;
   highlight?: boolean;
   pickLabel?: string;
+  /** The text is shown in a sheet: a tap outside a word's sheet closes that one too (pulling it down closes only the word) */
+  onDismissAll?: () => void;
   /** Furigana the page prints: it wins over the dictionary */
   printed?: Printed[];
   /** Show the furigana switch under the text (the reader has one for all paragraphs) */
@@ -36,7 +38,7 @@ function readFurigana(): boolean {
   }
 }
 
-export function TokenText({ text, target, suggested, onPick, onTokens, className = 'sentence', highlight, pickLabel, furiganaToggle = true, printed }: Props) {
+export function TokenText({ text, target, suggested, onPick, onTokens, className = 'sentence', highlight, pickLabel, furiganaToggle = true, printed, onDismissAll }: Props) {
   const [tokens, setTokens] = useState<Token[]>();
   const [statuses, setStatuses] = useState<Record<string, WordStatus | undefined>>();
   const [open, setOpen] = useState<number>();
@@ -131,6 +133,13 @@ export function TokenText({ text, target, suggested, onPick, onTokens, className
             if (highlight) statusOf([...new Set(tokens.filter(isWord).map((x) => x.base))]).then(setStatuses, () => undefined);
           }}
           pickLabel={pickLabel}
+          onCloseAll={
+            onDismissAll &&
+            (() => {
+              setOpen(undefined);
+              onDismissAll();
+            })
+          }
           onPick={
             onPick &&
             ((l) => {

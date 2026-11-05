@@ -1,24 +1,30 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { kanjiInfo, lookupAt, type KanjiInfo, type Lookup, type Token } from '../lib/japanese.ts';
 import { kanjiOf } from '../../../shared/kanji.ts';
 import { dictExtras, setWordStatus, statusOf } from '../lib/words.ts';
 import { STATUSES, type WordStatus } from '../../../shared/words.ts';
 import { pitchName, type DictHit } from '../../../shared/yomitan.ts';
 import { Sheet } from './Sheet.tsx';
+import { SpeakButton } from './SpeakButton.tsx';
 
 // Bottom sheet with dictionary results for the tapped word (longest match first), then its kanji one by one
 // (KANJIDIC), which is also the answer when JMdict has no word at all.
 // `onPick` is offered when the caller can use a word, e.g. as card target.
+// It is drawn on the page itself, not inside the sheet it was opened from: otherwise pulling it down would pull that
+// one down too. Pulling it down closes only this sheet; a tap outside it closes both (`onCloseAll`).
 
 type Props = {
   tokens: Token[];
   index: number;
   onClose: () => void;
+  /** A tap outside the sheet: when it was opened from another sheet, that one goes too */
+  onCloseAll?: () => void;
   onPick?: (l: Lookup) => void;
   pickLabel?: string;
 };
 
-export function WordSheet({ tokens, index, onClose, onPick, pickLabel = 'Use as target' }: Props) {
+export function WordSheet({ tokens, index, onClose, onCloseAll, onPick, pickLabel = 'Use as target' }: Props) {
   const [results, setResults] = useState<Lookup[]>();
   const [error, setError] = useState<string>();
   const [status, setStatus] = useState<Record<string, WordStatus | undefined>>({});
@@ -48,10 +54,16 @@ export function WordSheet({ tokens, index, onClose, onPick, pickLabel = 'Use as 
 
   const tok = tokens[index];
   const chars = kanjiOf(results?.[0]?.text ?? tok.surface);
-  return (
+  return createPortal(
     <>
-      <div className="sheet-backdrop" onClick={onClose} />
-      <Sheet onClose={onClose}>
+      <div
+        className="sheet-backdrop word-backdrop"
+        onClick={(e) => {
+          e.stopPropagation();
+          (onCloseAll ?? onClose)();
+        }}
+      />
+      <Sheet className="word-sheet" onClose={onClose}>
         {error && <p className="muted">{error}</p>}
         {!results && !error && (
           <p className="muted row">
@@ -83,6 +95,7 @@ export function WordSheet({ tokens, index, onClose, onPick, pickLabel = 'Use as 
                 <span className="head jp">{l.form}</span>
                 {l.form !== l.text && <span className="reading jp">{l.text}</span>}
               </div>
+              <SpeakButton text={l.entries[0]?.kana[0] ?? l.form} className="icon-btn ghost" />
               {onPick && (
                 <button className="small primary" onClick={() => onPick(l)}>
                   {pickLabel}
@@ -120,7 +133,8 @@ export function WordSheet({ tokens, index, onClose, onPick, pickLabel = 'Use as 
         ))}
         {results && chars.length > 0 && <KanjiList chars={chars} info={kanji} />}
       </Sheet>
-    </>
+    </>,
+    document.body,
   );
 }
 

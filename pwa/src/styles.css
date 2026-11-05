@@ -408,6 +408,8 @@ label.toggle input:checked::before { transform: translateX(20px); background: va
   padding: 8px 24px calc(22px + env(safe-area-inset-bottom)); box-shadow: 0 -1px 0 var(--line-strong), 0 -12px 40px rgba(0, 0, 0, 0.22);
   animation: rise 0.36s cubic-bezier(0.2, 0.9, 0.25, 1);
 }
+.word-backdrop { z-index: 40; }
+.word-sheet { z-index: 41; }
 .sheet .grabber { width: 34px; height: 4px; border-radius: 2px; background: var(--line-strong); margin: 0 auto 14px; }
 @keyframes rise { from { transform: translateY(100%); } }
 @keyframes fade { from { opacity: 0; } }

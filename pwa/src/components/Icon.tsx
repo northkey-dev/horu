@@ -20,6 +20,7 @@ const PATHS: Record<string, string> = {
   check: 'M5 12.5 10 17l9-10',
   trash: 'M4 7h16 M10 11v6 M14 11v6 M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12 M9 7V4h6v3',
   card: 'M4 6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5v11a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5v-11Z M8 10h8 M8 14h5',
+  speaker: 'M4 9.5v5h3.5l4.5 4v-13l-4.5 4H4Z M15.5 9.2a4 4 0 0 1 0 5.6 M18.3 6.4a8 8 0 0 1 0 11.2',
   wave: 'M4 10v4 M8 7v10 M12 4v16 M16 8v8 M20 11v2',
   upload: 'M12 16V4 M7 9l5-5 5 5 M5 20h14',
   edit: 'M4 20h4L19 9l-4-4L4 16v4Z M14 6l4 4',
