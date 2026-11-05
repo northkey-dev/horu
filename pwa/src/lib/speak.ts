@@ -16,8 +16,26 @@ function japaneseVoice(): SpeechSynthesisVoice | undefined {
   return voices.find((v) => /enhanced|premium|natural|neural|google/i.test(v.name)) ?? voices[0];
 }
 
-/** A tiny silent sound. Played inside the tap, it lets iOS play the laptop's voice a moment later. */
-const SILENCE = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+/** One second of silence as a WAV file (8 kHz, 8 bit, mono; 128 is silence). */
+function silence(): string {
+  const rate = 8000;
+  const bytes = new Uint8Array(44 + rate).fill(128);
+  const view = new DataView(bytes.buffer);
+  const text = (at: number, s: string) => [...s].forEach((c, i) => view.setUint8(at + i, c.charCodeAt(0)));
+  text(0, 'RIFF');
+  view.setUint32(4, 36 + rate, true);
+  text(8, 'WAVEfmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, 1, true); // mono
+  view.setUint32(24, rate, true);
+  view.setUint32(28, rate, true);
+  view.setUint16(32, 1, true);
+  view.setUint16(34, 8, true);
+  text(36, 'data');
+  view.setUint32(40, rate, true);
+  return URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' }));
+}
 
 // Kept in the open: a browser may drop an utterance nobody refers to while it is being read.
 let reading: SpeechSynthesisUtterance | undefined;
@@ -36,6 +54,8 @@ export function speak(text: string, { readings, done }: Options): () => void {
   const finish = (problem?: string) => {
     if (over) return;
     over = true;
+    audio.pause();
+    URL.revokeObjectURL(quiet);
     done(problem);
   };
   const stop = () => {
@@ -43,7 +63,17 @@ export function speak(text: string, { readings, done }: Options): () => void {
     finish();
   };
 
-  const audio = new Audio(SILENCE); // made inside the tap
+  // Inside the tap, before anything is waited for, and for the whole reading: a silent sound that plays all the
+  // time. iOS then treats the page as one that plays audio, so the silent switch does not mute the voice, and it
+  // allows the laptop's voice to start when it is ready, which takes a few seconds, far longer than a tap is "fresh".
+  try {
+    (navigator as Navigator & { audioSession?: { type: string } }).audioSession!.type = 'playback';
+  } catch {
+    // older iOS and other browsers do not have it
+  }
+  const quiet = silence();
+  const audio = new Audio(quiet);
+  audio.loop = true;
   void audio.play().catch(() => undefined);
 
   async function withLaptop(): Promise<void> {
@@ -70,10 +100,11 @@ export function speak(text: string, { readings, done }: Options): () => void {
         URL.revokeObjectURL(url);
         finish();
       };
+      audio.loop = false;
       audio.src = url;
       await audio.play();
-    } catch {
-      finish('The voice could not be played. Check that the laptop is reachable.');
+    } catch (e) {
+      finish(`The voice could not be played (${(e as Error).name || 'error'}). Check that the laptop is reachable.`);
     }
   }
 
