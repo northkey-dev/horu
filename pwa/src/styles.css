@@ -467,6 +467,20 @@ img.cover { box-shadow: 0 0 0 var(--hair) var(--line-strong); }
 .reader-page .blocks { position: absolute; }
 .reader-page .block { position: absolute; border-radius: 5px; cursor: pointer; }
 .reader-page .block.active { background: rgba(228, 96, 74, 0.16); box-shadow: 0 0 0 2px #e4604a; }
+.reader-page .block-frame { position: absolute; box-shadow: 0 0 0 2px #e4604a, 0 0 0 9999px rgba(0, 0, 0, 0.5); background: rgba(228, 96, 74, 0.1); cursor: move; touch-action: none; }
+.block-frame .grip { --hit: calc(40px * var(--unzoom)); position: absolute; touch-action: none; }
+.block-frame .grip.n, .block-frame .grip.s { left: calc(var(--hit) / 2); right: calc(var(--hit) / 2); height: var(--hit); cursor: ns-resize; }
+.block-frame .grip.e, .block-frame .grip.w { top: calc(var(--hit) / 2); bottom: calc(var(--hit) / 2); width: var(--hit); cursor: ew-resize; }
+.block-frame .grip.nw, .block-frame .grip.ne, .block-frame .grip.sw, .block-frame .grip.se { width: var(--hit); height: var(--hit); }
+.block-frame .grip.n, .block-frame .grip.nw, .block-frame .grip.ne { top: calc(var(--hit) / -2); }
+.block-frame .grip.s, .block-frame .grip.sw, .block-frame .grip.se { bottom: calc(var(--hit) / -2); }
+.block-frame .grip.w, .block-frame .grip.nw, .block-frame .grip.sw { left: calc(var(--hit) / -2); }
+.block-frame .grip.e, .block-frame .grip.ne, .block-frame .grip.se { right: calc(var(--hit) / -2); }
+.block-frame .grip.nw, .block-frame .grip.se { cursor: nwse-resize; }
+.block-frame .grip.ne, .block-frame .grip.sw { cursor: nesw-resize; }
+.block-frame .grip.nw::after, .block-frame .grip.ne::after, .block-frame .grip.sw::after, .block-frame .grip.se::after { content: ''; position: absolute; left: 50%; top: 50%; width: calc(12px * var(--unzoom)); height: calc(12px * var(--unzoom)); transform: translate(-50%, -50%); border-radius: 50%; background: #fff; box-shadow: 0 0 0 calc(2px * var(--unzoom)) #e4604a; }
+.reader-bottom button.primary { background: #e4604a; color: #fff; min-width: 96px; }
+.frame-hint { font-size: 13px; line-height: 17px; color: #a39a8b; }
 .reader-sheet { z-index: 30; }
 .reader-sheet .translation { margin-top: 12px; padding-top: 10px; border-top: var(--hair) solid var(--line); }
 .reader-sheet .translation p { margin: 0 0 6px; font-size: 16px; line-height: 23px; }

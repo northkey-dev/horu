@@ -48,7 +48,7 @@ export type PreparedChapter = {
   rereadPages?: number;
 };
 
-export type PageBlock = { box: [number, number, number, number]; vertical: boolean; text: string; readings?: Printed[] };
+export type PageBlock = { box: [number, number, number, number]; vertical: boolean; text: string; readings?: Printed[]; /** The frame was set by hand: reading the chapter again keeps it */ framed?: boolean };
 export type ChapterPage = { file: string; w: number; h: number; blocks: PageBlock[] };
 export type ChapterData = { key: string; mangaKey: string; mangaTitle: string; name: string; order: number; pages: ChapterPage[] };
 

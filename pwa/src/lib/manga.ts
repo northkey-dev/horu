@@ -41,7 +41,7 @@ export type PreparedChapter = {
   chinese?: boolean;
 };
 
-export type PageBlock = { readings?: Printed[]; box: [number, number, number, number]; vertical: boolean; text: string };
+export type PageBlock = { readings?: Printed[]; box: [number, number, number, number]; vertical: boolean; text: string; framed?: boolean };
 export type ChapterData = {
   key: string;
   mangaKey: string;
@@ -161,6 +161,12 @@ export const mangaApi = {
   },
   resumeChapter: (key: string) => send<PreparedChapter>('POST', `/api/manga/chapters/${key}/resume`),
   rereadChapter: (key: string) => send<PreparedChapter>('POST', `/api/manga/chapters/${key}/reread`),
+  /** Reads a speech bubble again inside a new frame (page pixels). Needs the laptop; a copy saved on this phone gets the new text too. */
+  readFrame: async (key: string, page: number, block: number, box: PageBlock['box']) => {
+    const fixed = await send<PageBlock>('POST', `/api/manga/chapters/${key}/pages/${page}/blocks/${block}/frame`, { box });
+    await saveBlockOffline(key, page, block, fixed);
+    return fixed;
+  },
   rereadManga: (key: string) => send<PreparedChapter[]>('POST', `/api/manga/library/${key}/reread`),
   pauseDownloads: (mangaKey: string, pause: boolean) => send<PreparedChapter[]>('POST', `/api/manga/library/${mangaKey}/downloads`, { pause }),
   serverSearch: (q: string) => get<{ id: string; name: string; books?: number }[]>(`/api/manga/server/search?q=${encodeURIComponent(q)}`),
@@ -211,6 +217,16 @@ export async function loadChapter(key: string): Promise<ChapterData> {
       chapter.status === 'error' ? chapter.error ?? 'Failed' : chapter.status === 'cancelled' ? 'This chapter was deleted. Download it again from the chapter list.' : 'Chapter is still being prepared',
     );
   return data;
+}
+
+async function saveBlockOffline(key: string, page: number, block: number, fixed: PageBlock): Promise<void> {
+  if (!canCache()) return;
+  const cache = await caches.open(CACHE);
+  const url = `/offline/chapter/${key}.json`;
+  const data = (await (await cache.match(url))?.json()) as ChapterData | undefined;
+  if (!data?.pages[page]?.blocks[block]) return;
+  data.pages[page].blocks[block] = fixed;
+  await cache.put(url, new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } }));
 }
 
 export type SyncProgress = { done: number; total: number; current?: string };

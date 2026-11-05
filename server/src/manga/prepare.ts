@@ -5,7 +5,8 @@ import { realWords, trustedPrinted } from '../../../shared/readings.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { getSettings } from '../config.ts';
-import { looksChinese } from '../../../shared/lang.ts';
+import { looksChinese, looksJapanese } from '../../../shared/lang.ts';
+import { clampFrame, keepFramed } from '../../../shared/frames.ts';
 import { friendlyMangaError } from '../../../shared/mangaErrors.ts';
 import { log } from '../log.ts';
 import { PyWorker } from '../pyworker.ts';
@@ -17,7 +18,8 @@ import * as suwa from './suwayomi.ts';
 // "next N chapters" window filled for every manga marked as reading.
 
 const ocr = new PyWorker('ocr', 'ocr_worker.py', () => [], 5 * 60_000);
-type OcrPage = { page: { img_width: number; img_height: number; blocks: { box: number[]; vertical: boolean; lines: string[]; furigana?: { base: string; ruby: string }[] }[] } };
+type Furigana = { base: string; ruby: string }[];
+type OcrPage = { page: { img_width: number; img_height: number; blocks: { box: number[]; vertical: boolean; lines: string[]; furigana?: Furigana }[] } };
 
 export function ocrAvailable(): boolean {
   return ocr.available();
@@ -132,11 +134,17 @@ export function pauseManga(mangaKey: string, pause: boolean): void {
   }
 }
 
-async function chapterPage(file: string, res: OcrPage): Promise<lib.ChapterPage> {
+/** Turns the furigana read off a page into the readings worth keeping for a text. */
+async function printedReadings() {
   const dic = await loadKanjidic().catch(() => ({}));
   const index = lookupIndex();
   const known = (word: string) => index?.get(word)?.flatMap((e) => e[1].split('|')) ?? [];
   const tokens = await tokenizer();
+  return (text: string, furigana: Furigana = []) => realWords(trustedPrinted(furigana, dic, known), tokens.tokenize(text), known);
+}
+
+async function chapterPage(file: string, res: OcrPage): Promise<lib.ChapterPage> {
+  const readingsOf = await printedReadings();
   return {
     file,
     w: res.page.img_width,
@@ -144,11 +152,38 @@ async function chapterPage(file: string, res: OcrPage): Promise<lib.ChapterPage>
     blocks: res.page.blocks
       .map((b) => {
         const text = b.lines.join('');
-        const readings = realWords(trustedPrinted(b.furigana ?? [], dic, known), tokens.tokenize(text), known);
+        const readings = readingsOf(text, b.furigana);
         return { box: b.box.slice(0, 4) as [number, number, number, number], vertical: b.vertical, text, ...(readings.length ? { readings } : {}) };
       })
       .filter((b) => b.text.trim()),
   };
+}
+
+// ---- reading one speech bubble again, in a frame set by hand ----
+
+const GONE = 'This speech bubble is no longer there. Open the chapter again.';
+
+/** Reads what the frame holds and puts it in place of the bubble. A frame without Japanese text changes nothing. */
+export async function readFrame(key: string, pageIndex: number, blockIndex: number, box: unknown): Promise<lib.PageBlock> {
+  const page = lib.readChapterData(key)?.pages[pageIndex];
+  if (!page?.blocks[blockIndex]) throw new Error(GONE);
+  if (!ocr.available()) throw new Error('Text recognition is not installed on the laptop.');
+  const frame = clampFrame(box, page.w, page.h);
+  if (!frame) throw new Error('Frame the text first.');
+  const { framed } = await ocr.request<{ framed: { text: string; vertical: boolean; furigana: Furigana } }>({ file: path.join(lib.chapterDir(key), page.file), frame });
+  const text = framed.text.trim();
+  if (!looksJapanese(text)) throw new Error('No Japanese text found in this frame. Make it a little larger and try again.');
+  const readings = (await printedReadings())(text, framed.furigana);
+  // Loaded again: the chapter may have changed during the wait.
+  const data = lib.readChapterData(key);
+  const blocks = data?.pages[pageIndex]?.blocks;
+  if (!data || !blocks?.[blockIndex]) throw new Error(GONE);
+  const block: lib.PageBlock = { box: frame, vertical: framed.vertical, text, framed: true, ...(readings.length ? { readings } : {}) };
+  blocks[blockIndex] = block;
+  lib.writeChapterData(data);
+  // A new date, so a phone with this chapter saved fetches the new text with its next sync.
+  lib.updateChapter(key, { preparedAt: new Date().toISOString() });
+  return block;
 }
 
 // ---- reading a finished chapter again (a better text recognition) ----
@@ -180,7 +215,9 @@ async function drainRereads(): Promise<void> {
           pages.push(await chapterPage(page.file, await ocr.request<OcrPage>({ file: path.join(lib.chapterDir(key), page.file) })));
           lib.updateChapter(key, { rereadPages: pages.length });
         }
-        lib.writeChapterData({ ...data, pages });
+        // Bubbles framed by hand stay, also those framed while this ran.
+        const now = lib.readChapterData(key) ?? data;
+        lib.writeChapterData({ ...data, pages: pages.map((p, i) => ({ ...p, blocks: keepFramed(now.pages[i]?.blocks ?? [], p.blocks) })) });
         // A new date, so a phone with this chapter saved fetches the new text with its next sync.
         lib.updateChapter(key, { preparedAt: new Date().toISOString() });
         log.info(`Read again: ${data.mangaTitle} / ${data.name}`);

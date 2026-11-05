@@ -6,6 +6,8 @@ and each found line is read by manga-ocr (without EasyOCR installed the manga de
                                               {"id": "...", "file": "C:/.../photo.jpg", "photo": true}
 or, for a region the user framed on a photo (no text detection, the model just reads it):
                                               {"id": "...", "file": "C:/.../photo.jpg", "region": [x1, y1, x2, y2]}
+or, for a speech bubble the user framed on a manga page (answers {"id": "...", "framed": {text, vertical, furigana}}):
+                                              {"id": "...", "file": "C:/.../001.jpg", "frame": [x1, y1, x2, y2]}
 Writes one JSON response per line to stdout: {"id": "...", "page": {img_width, img_height, blocks: [...]}}
 Models are loaded once and stay in memory while the server keeps this process alive.
 """
@@ -15,6 +17,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -266,6 +269,38 @@ def read_region(file, box):
         return read_crop(im.convert("RGB"), box)
 
 
+def letters(text):
+    return len(re.sub(r"[\s.．…・。、！？!?]", "", text))
+
+
+def read_frame(file, box):
+    """Reads what the user framed on a manga page. The page keeps its size with everything outside the frame painted
+    white: the detector is made for whole pages and finds next to nothing on a crop. It can also miss columns on the
+    page, which may be why the frame was moved, so when the model alone reads clearly more, that reading is used.
+    On an empty frame the model makes a sentence up, so it only gets a frame with something printed in it."""
+    with Image.open(file) as im:
+        im = im.convert("RGB")
+    x1, y1, x2, y2 = [int(v) for v in box]
+    crop = im.crop((x1, y1, x2, y2))
+    page = Image.new("RGB", im.size, "white")
+    page.paste(crop, (x1, y1))
+    handle, tmp = tempfile.mkstemp(suffix=".png")
+    os.close(handle)
+    try:
+        page.save(tmp)
+        blocks = [b for b in ocr(tmp).get("blocks", []) if "".join(b.get("lines", [])).strip()]
+        furigana = page_furigana(tmp, blocks)
+    finally:
+        os.remove(tmp)
+    vertical = sum(1 for b in blocks if b.get("vertical")) * 2 >= len(blocks) if blocks else crop.height > crop.width
+    order = sorted(range(len(blocks)), key=lambda i: -blocks[i]["box"][2] if vertical else blocks[i]["box"][1])
+    text = "".join("".join(blocks[i]["lines"]) for i in order)
+    alone = mocr(crop) if np.array(crop.convert("L")).std() >= 8 else ""
+    if letters(alone) >= letters(text) * 1.5 + 2:
+        return {"text": alone, "vertical": vertical, "furigana": []}
+    return {"text": text, "vertical": vertical, "furigana": [f for i in order for f in furigana[i]]}
+
+
 _craft = None
 
 
@@ -318,6 +353,9 @@ for line in sys.stdin:
     try:
         if "region" in req:
             print(json.dumps({"id": req["id"], "text": read_region(req["file"], req["region"])}, ensure_ascii=False), flush=True)
+            continue
+        if "frame" in req:
+            print(json.dumps({"id": req["id"], "framed": read_frame(req["file"], req["frame"])}, ensure_ascii=False), flush=True)
             continue
         if req.get("photo"):
             photo = read_photo(req["file"])

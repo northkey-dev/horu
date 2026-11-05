@@ -24,10 +24,12 @@ type Props = {
   readings?: Printed[];
   /** Mine the line, with the tapped word already chosen when there is one */
   onMine: (targetHint?: string) => void;
+  /** Change the frame around the text so it is read again; left out where there is none */
+  onReframe?: () => void;
   onClose: () => void;
 };
 
-export function TextSheet({ text, readings, edited, source, context, onEdit, onMine, onClose }: Props) {
+export function TextSheet({ text, readings, edited, source, context, onEdit, onMine, onReframe, onClose }: Props) {
   const [translation, setTranslation] = useState<Translation | 'busy' | 'copied' | { error: string }>();
   const [draft, setDraft] = useState<string>();
 
@@ -71,10 +73,15 @@ export function TextSheet({ text, readings, edited, source, context, onEdit, onM
         </div>
       )}
       {draft === undefined && (
-        <div className="row" style={{ gap: 4, marginTop: 4 }}>
+        <div className="row" style={{ gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
           <button className="ghost small" onClick={() => setDraft(text)}>
             Fix the text
           </button>
+          {onReframe && (
+            <button className="ghost small" onClick={onReframe}>
+              Adjust the frame
+            </button>
+          )}
           {edited && (
             <button className="ghost small" onClick={() => save(undefined)}>
               Back to the recognised text

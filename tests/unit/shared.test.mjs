@@ -5,6 +5,7 @@ import { lookupDicts, parseYomitan, pitchName } from '../../shared/yomitan.ts';
 import { parseWordList } from '../../shared/words.ts';
 import { parseExplanation } from '../../shared/ai.ts';
 import { alignReading, furiganaHtml } from '../../shared/furigana.ts';
+import { MIN_FRAME, clampFrame, dragFrame, keepFramed } from '../../shared/frames.ts';
 
 const zip = (files) => zipSync(Object.fromEntries(Object.entries(files).map(([k, v]) => [k, strToU8(JSON.stringify(v))])));
 
@@ -120,4 +121,27 @@ test('lang: German and English lines are not Japanese, mixed lines with Japanese
 test('a card field is text: HTML in a sentence cannot run in Anki', async () => {
   const { highlight } = await import('../../shared/furigana.ts');
   assert.equal(highlight('<img src=x onerror=alert(1)>猫だ', 28, 29), '&lt;img src=x onerror=alert(1)&gt;<b>猫</b>だ');
+});
+
+test('frame: stays on the page, keeps a usable size, and only the dragged sides move', () => {
+  assert.deepEqual(dragFrame([100, 100, 200, 300], 'se', 50, -20, 1000, 1000), [100, 100, 250, 280]);
+  assert.deepEqual(dragFrame([100, 100, 200, 300], 'w', -500, 40, 1000, 1000), [0, 100, 200, 300]);
+  assert.deepEqual(dragFrame([100, 100, 200, 300], 'n', 0, 900, 1000, 1000), [100, 300 - MIN_FRAME, 200, 300]);
+  assert.deepEqual(dragFrame([100, 100, 200, 300], 'move', 900, -900, 1000, 1000), [900, 0, 1000, 200]);
+});
+
+test('frame: a frame from the phone is checked before it is read', () => {
+  assert.deepEqual(clampFrame([-5, 10.4, 2000, 90], 800, 1200), [0, 10, 800, 90]);
+  assert.equal(clampFrame([10, 10, 15, 200], 800, 1200), undefined);
+  assert.equal(clampFrame([10, 10, 'x', 200], 800, 1200), undefined);
+  assert.equal(clampFrame(undefined, 800, 1200), undefined);
+});
+
+test('frame: reading a chapter again keeps bubbles framed by hand, in their place', () => {
+  const block = (text, box, framed) => ({ text, box, ...(framed ? { framed } : {}) });
+  const hand = block('hand', [100, 100, 300, 300], true);
+  const after = [block('a', [500, 0, 600, 90]), block('cut', [120, 120, 200, 200]), block('half', [210, 120, 290, 280]), block('b', [0, 500, 90, 600])];
+  assert.deepEqual(keepFramed([block('old', [500, 0, 600, 90]), hand], after).map((b) => b.text), ['a', 'hand', 'b']);
+  assert.deepEqual(keepFramed([hand], [block('b', [0, 500, 90, 600])]).map((b) => b.text), ['b', 'hand']);
+  assert.deepEqual(keepFramed([block('old', [0, 0, 50, 50])], after), after);
 });

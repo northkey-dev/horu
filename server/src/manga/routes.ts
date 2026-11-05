@@ -8,7 +8,7 @@ import * as store from '../store.ts';
 import { primingFor } from '../knownWords.ts';
 import * as lib from './library.ts';
 import * as suwa from './suwayomi.ts';
-import { enqueue, ocrAvailable, pauseManga, rereadChapter, resumeChapter, scheduleSync, sortChapters, startMangaWorker as start, stopChapter } from './prepare.ts';
+import { enqueue, ocrAvailable, pauseManga, readFrame, rereadChapter, resumeChapter, scheduleSync, sortChapters, startMangaWorker as start, stopChapter } from './prepare.ts';
 import { importArchive } from './importer.ts';
 import { cropAround } from '../crop.ts';
 import { downloadBook, searchServer, serverBooks, serverName } from './servers.ts';
@@ -221,6 +221,10 @@ export function mangaRouter(): express.Router {
       rereadChapter(param(req, 'key'));
       return lib.getChapter(param(req, 'key'));
     }),
+  );
+  r.post(
+    '/chapters/:key/pages/:page/blocks/:block/frame',
+    h((req) => readFrame(param(req, 'key'), Number(param(req, 'page')), Number(param(req, 'block')), (req.body as { box?: unknown }).box)),
   );
   r.post(
     '/library/:key/reread',

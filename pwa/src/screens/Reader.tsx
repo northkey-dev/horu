@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { navigate } from '../lib/hooks.ts';
-import { fileUrl, loadChapter, mangaApi, mineLine, offlineChaptersOf, reportProgress, type ChapterData } from '../lib/manga.ts';
+import { describeError, fileUrl, loadChapter, mangaApi, mineLine, offlineChaptersOf, reportProgress, type ChapterData } from '../lib/manga.ts';
+import { dragFrame, type Box, type Grip } from '../../../shared/frames.ts';
 import { looksChinese } from '../../../shared/lang.ts';
 import { TokenText, isWord } from '../components/TokenText.tsx';
 import { tokenize } from '../lib/japanese.ts';
@@ -11,13 +12,15 @@ import { TextSheet } from '../components/TextSheet.tsx';
 
 // Full-screen manga reader. Japanese order: tap the LEFT side (or swipe right)
 // for the next page. Tap a speech bubble to read it with the dictionary or translate it whole. Pinch or
-// double-tap the middle to zoom in; the bubbles zoom with the page.
+// double-tap the middle to zoom in; the bubbles zoom with the page. A bubble read wrongly can get a new frame:
+// its corners and edges are dragged, the page can still be zoomed, and the laptop reads what the frame holds.
 
 type Rect = { left: number; top: number; scale: number };
 type Zoom = { s: number; x: number; y: number };
 
 const NO_ZOOM: Zoom = { s: 1, x: 0, y: 0 };
 const MAX_ZOOM = 4;
+const GRIPS: Exclude<Grip, 'move'>[] = ['n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se'];
 let spreadHinted = false;
 
 /** Keeps the zoomed page inside the stage (the page can be moved, but not out of the screen). */
@@ -98,6 +101,14 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
   const [spread, setSpread] = useState(false);
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
+  // The frame being adjusted (page pixels), the laptop reading it, and the drag going on
+  const [frame, setFrame] = useState<Box>();
+  const [readingFrame, setReadingFrame] = useState(false);
+  const frameRef = useRef(frame);
+  frameRef.current = frame;
+  const grab = useRef<{ id: number; grip: Grip; x: number; y: number; box: Box }>(undefined);
+  /** Counts the reads, so a laptop answering after Cancel changes nothing here */
+  const frameRead = useRef(0);
   /** Clicks that belong to a gesture (pinch, drag, swipe) do not turn the page */
   const quietUntil = useRef(0);
   const touchedAt = useRef(0);
@@ -108,6 +119,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
     setShown(undefined);
     setError(undefined);
     setBlock(undefined);
+    setFrame(undefined);
     loadChapter(chapterKey).then(
       (d) => {
         setData(d);
@@ -150,10 +162,13 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
     setRect({ left: (cw - current.w * scale) / 2, top: (ch - current.h * scale) / 2, scale });
   }, [current]);
 
+  // The stage changes size with the phone turning and with the bars coming and going.
   useEffect(() => {
     measure();
-    addEventListener('resize', measure);
-    return () => removeEventListener('resize', measure);
+    if (!stage.current) return;
+    const watch = new ResizeObserver(measure);
+    watch.observe(stage.current);
+    return () => watch.disconnect();
   }, [measure]);
 
   // Double-page spreads are small on a phone held upright: say what helps, once per visit.
@@ -283,7 +298,12 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
     const onStart = (e: TouchEvent) => {
       touchedAt.current = Date.now();
       const z = zoomRef.current;
+      if (e.touches.length === 1 && (e.target as Element).closest('.block-frame')) {
+        pinch = start = undefined; // the frame is being dragged, not the page
+        return;
+      }
       if (e.touches.length === 2) {
+        grab.current = undefined;
         const [a, b] = [e.touches[0], e.touches[1]];
         const m = local((a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2);
         pinch = { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), s: z.s, px: (m.x - z.x) / z.s, py: (m.y - z.y) / z.s };
@@ -328,7 +348,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
       const dy = t.clientY - from.y;
       const p = local(t.clientX, t.clientY);
       const zoomed = zoomRef.current.s > 1;
-      if (!zoomed && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - from.t < 600) {
+      if (!zoomed && !frameRef.current && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - from.t < 600) {
         e.preventDefault();
         quietUntil.current = Date.now() + 400;
         goRef.current(dx > 0 ? 1 : -1); // swipe right = next page (right-to-left reading)
@@ -358,7 +378,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
   }, [error]);
 
   function onTap(e: React.MouseEvent) {
-    if (Date.now() < quietUntil.current) return;
+    if (frame || Date.now() < quietUntil.current) return;
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const x = e.clientX - r.left;
     if (block !== undefined) return setBlock(undefined);
@@ -393,6 +413,45 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
     setEdits(saveBubbleEdit(editKey(block), text && text !== current?.blocks[block].text ? text : undefined));
   }
 
+  function grabFrame(e: React.PointerEvent, grip: Grip) {
+    e.stopPropagation();
+    if (!frame || readingFrame) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    grab.current = { id: e.pointerId, grip, x: e.clientX, y: e.clientY, box: frame };
+  }
+
+  function dragTheFrame(e: React.PointerEvent) {
+    const g = grab.current;
+    if (!g || g.id !== e.pointerId || !rect || !current) return;
+    const perPixel = rect.scale * zoomRef.current.s;
+    setFrame(dragFrame(g.box, g.grip, (e.clientX - g.x) / perPixel, (e.clientY - g.y) / perPixel, current.w, current.h));
+  }
+
+  function cancelFrame() {
+    frameRead.current++;
+    setReadingFrame(false);
+    setFrame(undefined);
+  }
+
+  async function readTheFrame() {
+    if (!frame || block === undefined || !view) return;
+    const run = ++frameRead.current;
+    const at = view.page;
+    setReadingFrame(true);
+    try {
+      const fixed = await mangaApi.readFrame(chapterKey, at, block, frame);
+      if (run !== frameRead.current) return;
+      setData((d) => d && { ...d, pages: d.pages.map((p, i) => (i === at ? { ...p, blocks: p.blocks.map((b, k) => (k === block ? fixed : b)) } : p)) });
+      setEdits(saveBubbleEdit(editKey(block), undefined)); // a correction by hand belonged to the old text
+      setFrame(undefined);
+    } catch (e) {
+      if (run !== frameRead.current) return;
+      setToast(describeError(e));
+      setTimeout(() => setToast(undefined), 3500);
+    }
+    setReadingFrame(false);
+  }
+
   if (error)
     return (
       <div className="reader">
@@ -409,7 +468,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
 
   return (
     <div className="reader">
-      {chrome && (
+      {chrome && !frame && (
         <div className="reader-top">
           <button className="icon-btn" onClick={() => navigate(data ? `manga/m/${data.mangaKey}` : 'manga')} aria-label="Back">
             <Icon name="back" size={28} weight={2.1} />
@@ -436,7 +495,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
           {view && <img src={view.src} alt="" draggable={false} onLoad={measure} />}
           {current && rect && (
             <div className="blocks" style={{ left: rect.left, top: rect.top }}>
-              {current.blocks.map((b, i) => (
+              {!frame && current.blocks.map((b, i) => (
                 <div
                   key={i}
                   className={`block${block === i ? ' active' : ''}${tints?.[i] ? ` tint-${tints[i]}` : ''}`}
@@ -452,6 +511,27 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
                   }}
                 />
               ))}
+              {frame && (
+                <div
+                  className="block-frame"
+                  style={{
+                    left: frame[0] * rect.scale,
+                    top: frame[1] * rect.scale,
+                    width: (frame[2] - frame[0]) * rect.scale,
+                    height: (frame[3] - frame[1]) * rect.scale,
+                    '--unzoom': 1 / zoom.s,
+                  } as React.CSSProperties}
+                  onPointerDown={(e) => grabFrame(e, 'move')}
+                  onPointerMove={dragTheFrame}
+                  onPointerUp={() => (grab.current = undefined)}
+                  onPointerCancel={() => (grab.current = undefined)}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {GRIPS.map((g) => (
+                    <span key={g} className={`grip ${g}`} onPointerDown={(e) => grabFrame(e, g)} />
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -465,7 +545,19 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
 
       {spread && <div className="reader-hint">Double-page spread: turn the phone sideways, or pinch / double-tap the middle to zoom in.</div>}
 
-      {chrome && data && (
+      {frame && (
+        <div className="reader-bottom">
+          <button className="ghost" onClick={cancelFrame}>
+            Cancel
+          </button>
+          <div className="grow center frame-hint">{readingFrame ? 'Reading the frame…' : 'Drag the corners and edges around the text'}</div>
+          <button className="primary" disabled={readingFrame} onClick={() => void readTheFrame()}>
+            {readingFrame ? <span className="spinner" /> : 'Read again'}
+          </button>
+        </div>
+      )}
+
+      {chrome && !frame && data && (
         <div className="reader-bottom">
           <button className="ghost" onClick={() => go(1)} aria-label="Next page">
             <Icon name="next" size={22} weight={2.1} /> Next
@@ -480,7 +572,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
         </div>
       )}
 
-      {block !== undefined && current?.blocks[block] && data && (
+      {block !== undefined && !frame && current?.blocks[block] && data && (
         <TextSheet
           key={`${view?.page}/${block}`}
           text={textOf(block)}
@@ -490,6 +582,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
           context={current.blocks.slice(Math.max(0, block - 3), block).map((_, k) => textOf(Math.max(0, block - 3) + k))}
           onEdit={editBubble}
           onMine={(hint) => void mine(hint)}
+          onReframe={() => setFrame(current.blocks[block].box)}
           onClose={() => setBlock(undefined)}
         />
       )}
