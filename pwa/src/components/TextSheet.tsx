@@ -75,7 +75,7 @@ export function TextSheet({ text, readings, edited, source, context, onEdit, onM
       )}
       {draft === undefined && (
         <div className="row" style={{ gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
-          <SpeakButton text={text} label="Listen" />
+          <SpeakButton text={text} readings={readings} label="Listen" />
           <button className="ghost small" onClick={() => setDraft(text)}>
             Fix the text
           </button>

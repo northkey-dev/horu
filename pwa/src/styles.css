@@ -536,7 +536,7 @@ ol.steps li::marker { color: var(--text-2); font-variant-numeric: tabular-nums; 
 
 .toast {
   position: fixed; left: 50%; bottom: calc(var(--tabbar) + env(safe-area-inset-bottom) + 20px); transform: translateX(-50%);
-  background: var(--ink); color: var(--bg); padding: 12px 20px; border-radius: 999px; font-size: 14.5px; font-weight: 500; z-index: 60;
+  background: var(--ink); color: var(--bg); padding: 12px 20px; border-radius: 18px; font-size: 14.5px; font-weight: 500; z-index: 60;
   box-shadow: var(--shadow-float); max-width: calc(100vw - 32px); width: max-content; text-align: center; pointer-events: none; animation: drop-up 0.35s cubic-bezier(0.2, 0.9, 0.25, 1);
 }
 .toast.top { bottom: auto; top: calc(env(safe-area-inset-top) + 12px); animation-name: drop; }
