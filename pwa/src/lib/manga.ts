@@ -380,8 +380,36 @@ export async function flushPending(): Promise<number> {
   return sent;
 }
 
+// The page each chapter was left on, kept on this phone the moment a page is turned: the laptop may be away, and
+// the app may be closed at any time. Only the newest 300 chapters are kept.
+const PAGES_KEY = 'horu-chapter-pages';
+
+export function savedPage(chapterKey: string): number | undefined {
+  const page = readJson<Record<string, number>>(PAGES_KEY, {})[chapterKey];
+  return Number.isInteger(page) && page >= 0 ? page : undefined;
+}
+
+function rememberPage(chapterKey: string, page: number): void {
+  const pages = readJson<Record<string, number>>(PAGES_KEY, {});
+  delete pages[chapterKey]; // so the newest are last
+  pages[chapterKey] = page;
+  const keys = Object.keys(pages);
+  for (const old of keys.slice(0, Math.max(0, keys.length - 300))) delete pages[old];
+  writeJson(PAGES_KEY, pages);
+}
+
 export async function reportProgress(body: { mangaKey: string; chapterKey: string; page: number; finished?: boolean }): Promise<void> {
   const full = { ...body, at: new Date().toISOString() };
+  rememberPage(body.chapterKey, body.page);
+  // The library list on this phone shows (and Continue opens) the new place at once.
+  const library = readJson<LibraryManga[]>(LIBRARY_KEY, []);
+  const entry = library.find((m) => m.key === body.mangaKey);
+  if (entry) {
+    entry.chapterKey = body.chapterKey;
+    entry.page = body.page;
+    entry.lastReadAt = full.at;
+    writeJson(LIBRARY_KEY, library);
+  }
   if (body.finished) markFinishedOffline(body.chapterKey);
   queue({ kind: 'progress', body: full });
   await flushPending().catch(() => 0);

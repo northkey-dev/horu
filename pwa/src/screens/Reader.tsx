@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { navigate } from '../lib/hooks.ts';
-import { describeError, fileUrl, loadChapter, mangaApi, mineLine, offlineChaptersOf, reportProgress, type ChapterData } from '../lib/manga.ts';
+import { describeError, fileUrl, loadChapter, mangaApi, mineLine, offlineChaptersOf, reportProgress, savedPage, type ChapterData } from '../lib/manga.ts';
 import { dragFrame, type Box, type Grip } from '../../../shared/frames.ts';
 import { looksChinese } from '../../../shared/lang.ts';
 import { TokenText, isWord } from '../components/TokenText.tsx';
@@ -123,8 +123,11 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
     loadChapter(chapterKey).then(
       (d) => {
         setData(d);
+        // Where this chapter was left: the page remembered on this phone, else the laptop's note. A chapter left on
+        // its last page was finished, and starts over.
         const lib = mangaApi.cachedLibrary().find((m) => m.key === d.mangaKey);
-        setPage(lib?.chapterKey === chapterKey && lib.page ? Math.min(lib.page, d.pages.length - 1) : 0);
+        const left = savedPage(chapterKey) ?? (lib?.chapterKey === chapterKey ? lib.page : undefined) ?? 0;
+        setPage(left >= d.pages.length - 1 ? 0 : left);
         // Chapters readable right now: offline copies plus (when online) ready ones on the laptop.
         const offline = offlineChaptersOf(d.mangaKey).map((c) => ({ key: c.key, order: c.order }));
         setReady(offline);

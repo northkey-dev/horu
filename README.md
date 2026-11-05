@@ -180,6 +180,7 @@ Good to know:
 - *Before you read* (on the manga page) shows how much of the chapter you will probably understand and its key new words. It can be switched off in Settings.
 - **Tint bubbles by new words** (off by default, Settings → Manga reader): bubbles with words you do not know yet get a colour, the stronger the more new words. It helps you find the bubbles worth your time. Takes effect when you open a chapter.
 - **Continue:** the Read page starts with a *Continue* button that opens the manga you read last, at the page where you stopped.
+- **Your place is remembered:** every chapter opens on the page you left it on, even if you closed the app in the middle, with or without the laptop (the phone keeps the place of your last 300 chapters). A chapter left on its last page counts as finished and starts again from page 1.
 
 ### Managing chapters
 
