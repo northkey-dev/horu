@@ -1,4 +1,7 @@
+import { useState } from 'react';
 import { api } from '../lib/api.ts';
+import { SearchBox } from '../components/SearchBox.tsx';
+import { matchesQuery } from '../../../shared/search.ts';
 import { navigate, usePoll } from '../lib/hooks.ts';
 import { Icon } from '../components/Icon.tsx';
 import { Nav } from '../components/Nav.tsx';
@@ -26,8 +29,9 @@ function dayLabel(iso: string): string {
 
 export function History() {
   const { data, error } = usePoll(() => api.moments(300), 5000);
+  const [query, setQuery] = useState('');
   const groups: { day: string; items: Moment[] }[] = [];
-  for (const m of data ?? []) {
+  for (const m of (data ?? []).filter((m) => matchesQuery(m, query))) {
     const day = dayLabel(m.createdAt);
     const last = groups[groups.length - 1];
     if (last?.day === day) last.items.push(m);
@@ -37,7 +41,9 @@ export function History() {
     <div>
       <Nav back="Inbox" to="inbox" />
       <h1>History</h1>
+      {!!data?.length && <SearchBox value={query} onChange={setQuery} placeholder="Search sentence, word or source" />}
       {error && <div className="banner error">{error.message}</div>}
+      {!!data?.length && !!query.trim() && !groups.length && <p className="muted">Nothing matches.</p>}
       {data && !data.length && (
         <div className="empty">
           <span className="glyph jp" aria-hidden="true">

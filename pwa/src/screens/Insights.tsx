@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { api } from '../lib/api.ts';
-import { usePoll } from '../lib/hooks.ts';
+import { navigate, usePoll } from '../lib/hooks.ts';
 import { Nav } from '../components/Nav.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { Bars, Heatmap, HourBars, Line, Range, Ring, Stack, WeekdayBars, fmtDay, fmtMinutes, fmtShort, type BarDatum } from '../components/charts.tsx';
@@ -192,6 +192,9 @@ function Overview({ a }: { a: Analytics }) {
 
   return (
     <>
+      <button className="list-item action-row" style={{ marginBottom: 12 }} onClick={() => navigate('practice')}>
+        Practice words and kanji from your marks
+      </button>
       <section className="hero">
         <div className="eyebrow">Streak</div>
         <div className="hero-row">

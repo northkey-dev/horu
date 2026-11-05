@@ -9,6 +9,7 @@ import { notify } from './webhook.ts';
 import { transcribe, whisperAvailable } from './whisper.ts';
 import { log } from './log.ts';
 import * as store from './store.ts';
+import { splitSentences } from '../../shared/sentences.ts';
 import type { Moment } from '../../shared/types.ts';
 import type { WordStatus } from '../../shared/words.ts';
 import { parseImport } from '../../shared/importLines.ts';
@@ -197,6 +198,34 @@ export function textRouter(): express.Router {
       });
       notify('mark', { moment });
       return moment;
+    }),
+  );
+
+  /**
+   * Text shared from the iPhone (an iOS Shortcut in the Share sheet: "Get contents of URL", POST, request body =
+   * the shared text, or JSON {text, title}). Every Japanese sentence of it lands in the inbox.
+   */
+  r.post(
+    '/share',
+    express.text({ type: 'text/*', limit: '1mb' }),
+    h((req) => {
+      const raw = typeof req.body === 'string' ? req.body : String(req.body?.text ?? '');
+      const sentences = splitSentences(raw);
+      if (!sentences.length) throw new Error('No Japanese sentences found in that text');
+      const title = String((req.body as { title?: string })?.title ?? req.query.title ?? 'Shared').slice(0, 80);
+      for (const sentence of sentences)
+        store.addMoment({
+          id: store.newId(),
+          kind: 'text',
+          createdAt: new Date().toISOString(),
+          status: 'ready',
+          title,
+          sourceLabel: title,
+          hasAudio: false,
+          hasImage: false,
+          candidates: [{ start: 0, end: 0, text: sentence, source: 'text' }],
+        });
+      return { count: sentences.length };
     }),
   );
 

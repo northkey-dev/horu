@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { Settings } from '../../shared/types.ts';
 import { DEFAULT_PROFILE } from '../../shared/ai.ts';
 import { readJsonKeepingDamaged } from './jsonFile.ts';
+import { migrateAi } from './aiSettings.ts';
 
 export const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 // Optional settings in .env next to package.json. Values already in the environment win.
@@ -65,8 +66,14 @@ const DEFAULT_SETTINGS: Settings = {
   showAdultSources: false,
   mangaExtensionRepo: '',
   aiEngine: 'claude',
-  aiApiKey: '',
-  aiModel: '',
+  aiFallback: '',
+  aiKeyGemini: '',
+  aiKeyAnthropic: '',
+  aiKeyOpenai: '',
+  aiModelGemini: '',
+  aiModelAnthropic: '',
+  aiModelOpenai: '',
+  aiModelOllama: '',
   ollamaUrl: 'http://127.0.0.1:11434',
   learnerProfile: DEFAULT_PROFILE,
   webhookUrl: '',
@@ -83,14 +90,14 @@ const DEFAULT_SETTINGS: Settings = {
   hookUrl: 'ws://127.0.0.1:6677',
 };
 
-let settings: Settings = { ...DEFAULT_SETTINGS, ...readJsonKeepingDamaged<Partial<Settings>>(SETTINGS_FILE, () => ({})) };
+let settings: Settings = { ...DEFAULT_SETTINGS, ...(migrateAi(readJsonKeepingDamaged<Record<string, unknown>>(SETTINGS_FILE, () => ({}))) as Partial<Settings>) };
 
 export function getSettings(): Settings {
   return settings;
 }
 
 /** Settings that are passwords: they never leave the laptop in full, not to the app and not to the cloud backup. */
-export const SECRET_SETTINGS = ['jimakuApiKey', 'aiApiKey', 'jpdbApiKey', 'wanikaniToken', 'anilistToken', 'playerToken', 'mangaServerKey'] as const;
+export const SECRET_SETTINGS = ['jimakuApiKey', 'aiKeyGemini', 'aiKeyAnthropic', 'aiKeyOpenai', 'jpdbApiKey', 'wanikaniToken', 'anilistToken', 'playerToken', 'mangaServerKey'] as const;
 const MASK = '••••';
 
 /** The settings as the app sees them. A long key keeps its last four characters, so you can tell which one is set. */

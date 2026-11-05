@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { laptopBase, parseLaptop, setLaptop } from '../lib/laptop.ts';
 import { flash } from '../lib/hooks.ts';
+import { connectionHint } from '../lib/api.ts';
 
 // Settings → Laptop: connect the app to a laptop by scanning the QR code on its pairing page
 // (tray icon → "Connect phone…") or by typing its Tailscale address.
@@ -77,7 +78,7 @@ export function LaptopConnect({ online }: { online: boolean }) {
             ? 'Horu works on this phone alone. A laptop adds audio and screenshots of what you watch, manga sources, Claude and Anki. On the laptop: tray icon → Connect phone…, then scan the code here. Both need Tailscale.'
             : online
               ? 'Connected. Without the laptop, Horu shows what this phone saved and sends changes when it is back.'
-              : 'Not reachable right now. Is the laptop on, and Tailscale running on both?')}
+              : `Not reachable right now. ${connectionHint() || 'Is the laptop on, and Tailscale running on both?'}`)}
       </p>
     </>
   );

@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import QRCode from 'qrcode';
 import http from 'node:http';
-import { ACCESS_TOKEN, APP_URL, PORT, ROOT_DIR, VERSION, getSettings, maskedSettings, updateSettings } from './config.ts';
+import { ACCESS_TOKEN, APP_URL, DATA_DIR, PORT, ROOT_DIR, VERSION, getSettings, maskedSettings, updateSettings } from './config.ts';
 import os from 'node:os';
 import { ankiOnline, existingTargets, isAnkiStarting, noteTypeId } from './anki.ts';
 import { notify } from './webhook.ts';
@@ -17,7 +17,7 @@ import { suwayomiInstalled } from './manga/suwayomi.ts';
 import { ocrAvailable } from './manga/prepare.ts';
 import { wordsReadByDay } from './text.ts';
 import { cardMade, wordState } from './knownWords.ts';
-import { createCard, translateOnLaptop } from './cards.ts';
+import { aiExamples, aiLog, aiLogStats, createCard, recordPhoneAnswer, translateOnLaptop } from './cards.ts';
 import { cardsHere } from './anki.ts';
 import { kanjiInfo, KANJI_GZ } from './kanji.ts';
 import { DICT_GZ, dictMeta, dictState, ensureDictionary, lookupIndex } from './dict.ts';
@@ -31,6 +31,10 @@ import { asPrinted } from '../../shared/readings.ts';
 import { candidatesAt } from '../../shared/subtitles.ts';
 import { importPhoneMoment, markMoment, receiveCapture, refreshCandidates, runWhisper, undoLastMoment } from './moments.ts';
 import { whisperAvailable } from './whisper.ts';
+import { autostartCheck, backupCheck, diskCheck, type Check } from './doctor.ts';
+import { backupDays } from './backup.ts';
+import { dayKey } from './analytics.ts';
+import { ENGINE_LABELS, aiChain } from '../../shared/ai.ts';
 import { log } from './log.ts';
 import * as store from './store.ts';
 import type { CardRequest, Cue, ExtMomentMeta, Moment, Session, Settings, Status } from '../../shared/types.ts';
@@ -98,7 +102,24 @@ export function apiRouter(): express.Router {
       const text = String(req.body?.text ?? '').trim().slice(0, 1000);
       if (!text) throw new Error('Nothing to translate');
       const context = Array.isArray(req.body?.context) ? (req.body.context as unknown[]).slice(-4).map((l) => String(l).slice(0, 300)) : [];
-      return translateOnLaptop({ text, context, source: String(req.body?.source ?? '').slice(0, 200), readings: asPrinted(req.body?.readings), wordByWord: req.body?.wordByWord === true });
+      return translateOnLaptop({ text, context, source: String(req.body?.source ?? '').slice(0, 200), readings: asPrinted(req.body?.readings), wordByWord: req.body?.wordByWord === true }, req.body?.fresh === true);
+    }),
+  );
+  // ---- the AI log (see aiLog.ts): ratings, answers from phone keys, examples for training a model ----
+  r.post(
+    '/ai/rate',
+    h((req) => {
+      const rating = req.body?.rating === 1 ? 1 : req.body?.rating === -1 ? -1 : undefined;
+      if (!rating || !aiLog.rate(String(req.body?.ref ?? ''), rating)) throw new Error('Unknown answer');
+    }),
+  );
+  r.post('/ai/record', h((req) => recordPhoneAnswer((req.body ?? {}) as Record<string, unknown>)));
+  r.get('/ai/stats', h(() => aiLogStats()));
+  r.get(
+    '/ai/examples',
+    h((req, res) => {
+      res.type('application/x-ndjson').setHeader('Content-Disposition', `attachment; filename="horu-ai-examples-${new Date().toISOString().slice(0, 10)}.jsonl"`);
+      res.send(aiExamples(req.query.rated === '1'));
     }),
   );
   r.post(
@@ -422,6 +443,54 @@ export function apiRouter(): express.Router {
       if (!claudeCache || Date.now() - claudeCache.at > 10 * 60_000) claudeCache = { at: Date.now(), ok: await claudeAvailable() };
       const ollama = await fetch(`${getSettings().ollamaUrl.replace(/\/+$/, '')}/api/tags`, { signal: AbortSignal.timeout(1500) }).then((r) => r.ok, () => false);
       return { whisper: whisperAvailable(), manga: suwayomiInstalled(), ocr: ocrAvailable(), voice: ttsInstalled(), claude: claudeCache.ok, ollama };
+    }),
+  );
+  /** Settings → Check everything: what Horu depends on, one line each. */
+  r.get(
+    '/doctor',
+    h(async () => {
+      const s = getSettings();
+      const checks: Check[] = [{ name: 'Horu on the laptop', state: 'ok', detail: `Version ${VERSION}, running` }];
+      const ts = await tailscaleUrl();
+      checks.push(
+        !ts.url
+          ? { name: 'Tailscale', state: 'bad', detail: 'Not running or not signed in.', fix: 'Start Tailscale on the laptop and sign in. The phone cannot reach Horu away from home without it.' }
+          : !ts.serving
+            ? { name: 'Tailscale', state: 'bad', detail: `Runs as ${ts.url}, but does not pass requests to Horu.`, fix: `In a terminal: tailscale serve --bg ${PORT}` }
+            : { name: 'Tailscale', state: 'ok', detail: `The phone reaches Horu at ${ts.url}` },
+      );
+      const run = process.platform === 'win32' ? await execFileP('reg', ['query', String.raw`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, '/v', 'Horu'], { timeout: 4000 }).then((o) => o.stdout.trim() || undefined, () => undefined) : undefined;
+      const auto = autostartCheck(process.platform, run, Boolean(process.env.HORU_DOCKER));
+      if (auto) checks.push(auto);
+      checkAnki();
+      checks.push(
+        !cardsHere()
+          ? { name: 'Anki', state: 'ok', detail: 'This Horu makes no cards itself (the phone does).' }
+          : anki.ok
+            ? { name: 'Anki', state: 'ok', detail: 'Connected through AnkiConnect' }
+            : { name: 'Anki', state: 'warn', detail: isAnkiStarting() ? 'Starting…' : 'Not running.', fix: 'Horu starts Anki when a card is made. If that fails, open Anki once and check that the AnkiConnect add-on is installed.' },
+      );
+      const ollama = await fetch(`${s.ollamaUrl.replace(/\/+$/, '')}/api/tags`, { signal: AbortSignal.timeout(1500) }).then((r) => r.ok, () => false);
+      if (!claudeCache || Date.now() - claudeCache.at > 10 * 60_000) claudeCache = { at: Date.now(), ok: await claudeAvailable() };
+      const ready: Record<string, boolean> = { claude: claudeCache.ok, gemini: Boolean(s.aiKeyGemini), anthropic: Boolean(s.aiKeyAnthropic), openai: Boolean(s.aiKeyOpenai), ollama };
+      const why: Record<string, string> = { claude: 'Claude Code is not installed or not signed in (run `claude` once in a terminal).', gemini: 'No API key.', anthropic: 'No API key.', openai: 'No API key.', ollama: 'Ollama is not running.' };
+      const order = aiChain(s.aiEngine, s.aiFallback);
+      order.forEach((e, i) =>
+        checks.push({
+          name: `AI ${i + 1}: ${ENGINE_LABELS[e].replace(/ \(.*\)$/, '')}`,
+          state: ready[e] ? 'ok' : i === 0 ? 'bad' : 'warn',
+          detail: ready[e] ? (i === 0 ? 'Asked first' : 'Fallback') : why[e],
+          fix: ready[e] ? undefined : 'Settings → Cards on the laptop → AI order',
+        }),
+      );
+      checks.push(
+        whisperAvailable() ? { name: 'Whisper', state: 'ok', detail: 'Ready' } : { name: 'Whisper', state: 'warn', detail: 'Not installed.', fix: 'Only needed to match lines to speech: scripts\\install.ps1 -Modules whisper' },
+      );
+      checks.push(dictState() === 'ready' ? { name: 'Dictionary', state: 'ok', detail: 'Ready' } : { name: 'Dictionary', state: 'warn', detail: dictState() === 'building' ? 'Being built…' : 'Missing.', fix: 'It is built on the next start; restart Horu.' });
+      const free = await fs.promises.statfs(DATA_DIR).then((f) => f.bavail * f.bsize, () => undefined);
+      checks.push(diskCheck(free));
+      checks.push(backupCheck(backupDays(), dayKey(Date.now())));
+      return checks;
     }),
   );
   r.get('/player/now', h(async () => (await nowPlaying()) ?? null));

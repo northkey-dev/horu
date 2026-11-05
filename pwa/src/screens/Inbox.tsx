@@ -7,6 +7,8 @@ import { InboxStack } from './InboxStack.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { Nav } from '../components/Nav.tsx';
 import type { Moment } from '../../../shared/types.ts';
+import { SearchBox } from '../components/SearchBox.tsx';
+import { matchesQuery } from '../../../shared/search.ts';
 
 const STATUS_LABEL: Record<string, string> = {
   capturing: 'Capturing audio',
@@ -55,12 +57,14 @@ export function Inbox() {
   const [view, setView] = useState(inboxView);
   const [editing, setEditing] = useState(false);
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
+  const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
   const { words, cards } = useWords(data);
 
   const canGo = (m: Moment) => m.status !== 'creating';
   const chosen = (data ?? []).filter((m) => picked.has(m.id) && canGo(m));
   const all = (data ?? []).filter(canGo);
+  const shown = (data ?? []).filter((m) => matchesQuery(m, query));
 
   function show(next: 'list' | 'swipe') {
     setView(next);
@@ -117,6 +121,7 @@ export function Inbox() {
       {!!data?.length && (
         <>
           <h2>{data.length} to review</h2>
+          {data.length > 5 && <SearchBox value={query} onChange={setQuery} placeholder="Search sentence, word or source" />}
           {!editing && (
             <div className="segmented inbox-view">
               <button className={view === 'list' ? 'on' : ''} onClick={() => show('list')}>
@@ -128,10 +133,10 @@ export function Inbox() {
             </div>
           )}
           {view === 'swipe' ? (
-            <InboxStack moments={data} refresh={refresh} />
+            <InboxStack moments={shown} refresh={refresh} />
           ) : (
             <div className="group">
-              {data.map((m) => (
+              {shown.map((m) => (
                 <InboxRow key={m.id} m={m} word={words[m.id]} hasCard={cards.has(words[m.id])} picking={editing} picked={picked.has(m.id)} disabled={editing && !canGo(m)} onPick={() => toggle(m.id)} />
               ))}
             </div>

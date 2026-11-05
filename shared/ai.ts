@@ -30,6 +30,20 @@ export const AI_LABELS: Record<AiService, string> = {
   ollama: 'Ollama on the laptop',
 };
 
+/** Everything that can write an explanation on the laptop: Claude Code (`claude -p`) and the HTTP services. */
+export type AiEngine = 'claude' | AiService;
+export const AI_ENGINES: AiEngine[] = ['claude', 'gemini', 'anthropic', 'openai', 'ollama'];
+export const ENGINE_LABELS: Record<AiEngine, string> = { claude: 'Claude Code (claude -p, your subscription)', ...AI_LABELS };
+
+/** The order the laptop asks its AIs in: the first one, then the fallbacks. Unknown names and repeats are dropped. */
+export function aiChain(primary: string, fallback: string): AiEngine[] {
+  const chain: AiEngine[] = [];
+  for (const name of [primary, ...fallback.split(',')].map((n) => n.trim())) {
+    if ((AI_ENGINES as string[]).includes(name) && !chain.includes(name as AiEngine)) chain.push(name as AiEngine);
+  }
+  return chain.length ? chain : ['claude'];
+}
+
 export const DEFAULT_PROFILE = 'Around JLPT N4, some N3. Learned from a textbook, weak kanji. Goal: understand anime by ear and read manga.';
 
 export const SCHEMA = {
@@ -78,7 +92,7 @@ export function chatPrompt(input: ExplainInput, profile?: string): string {
 
 /** Translation of a whole line, e.g. a manga speech bubble. */
 export type WordNote = { word: string; reading: string; meaning: string };
-export type Translation = { translation: string; notes: string; words?: WordNote[] };
+export type Translation = { translation: string; notes: string; words?: WordNote[]; /** The laptop's id for this answer (rating, asking again) */ ref?: string };
 
 export type TranslateInput = { text: string; context: string[]; source: string; readings?: Printed[]; wordByWord?: boolean };
 

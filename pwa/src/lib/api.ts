@@ -27,6 +27,35 @@ export const laptopMakesCards = () => cardsHere;
 /** The last status check reached the laptop. */
 export const laptopUp = () => reachable === true;
 
+// Why the last call failed, in words the user can act on. A browser only says "failed" for a wrong address, a
+// missing VPN and a refused connection alike; what it does tell apart is a call that got no answer at all
+// (a laptop that is off, asleep or behind a VPN that is not running) from one that was turned down at once.
+let why = '';
+export const connectionHint = (): string => why;
+export function failureHint(e: Error): string {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'This phone has no internet connection.';
+  if (e.name === 'TimeoutError') return 'The laptop gave no answer. Is it on and awake? Is Tailscale switched on in the phone’s Tailscale app?';
+  return 'The laptop’s address could not be reached. Open the Tailscale app on the phone: it must be connected and list the laptop.';
+}
+
+const SEEN = 'horu-laptop-version';
+/** The laptop version the last successful status check reported. */
+export function lastLaptopVersion(): string | undefined {
+  try {
+    return localStorage.getItem(SEEN) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+function seenLaptop(version: string): void {
+  why = '';
+  try {
+    localStorage.setItem(SEEN, version);
+  } catch {
+    // private mode: the hint just stays shorter
+  }
+}
+
 async function request<T>(method: string, path: string, body?: unknown, headers: Record<string, string> = {}, timeout = QUICK): Promise<T> {
   if (reachable === false && path !== '/api/status') throw new OfflineError('Laptop not reachable');
   let res: Response;
@@ -39,6 +68,7 @@ async function request<T>(method: string, path: string, body?: unknown, headers:
       signal: AbortSignal.timeout(timeout),
     });
   } catch (e) {
+    why = failureHint(e as Error);
     throw new OfflineError(laptopBase() === undefined ? (e as Error).message : 'Laptop not reachable');
   }
   if (res.status === 401) throw new Error('Not paired: open the pairing link from the laptop.');
@@ -155,7 +185,7 @@ const findMoment = async (id: string) =>
 export const api = {
   status: () =>
     request<Status>('GET', '/api/status', undefined, {}, 5000).then(
-      (s) => ((reachable = true), (cardsHere = s.cards !== false), s),
+      (s) => ((reachable = true), (cardsHere = s.cards !== false), seenLaptop(s.version), s),
       (e: Error) => {
         if (e instanceof OfflineError) reachable = false;
         throw e;
@@ -232,7 +262,20 @@ export const api = {
   },
   ankiNoteType: () => request<{ id?: number; deck: string }>('GET', '/api/anki/notetype', undefined, {}, 20_000),
   hasCards: (words: string[]) => request<{ existing: string[] }>('POST', '/api/anki/has-cards', { words }).then((r) => r.existing),
-  translate: (input: TranslateInput) => request<Translation>('POST', '/api/translate', input, {}, SLOW),
+  translate: (input: TranslateInput & { fresh?: boolean }) => request<Translation>('POST', '/api/translate', input, {}, SLOW),
+  /** Marks a laptop answer good (1) or poor (-1) in its AI log */
+  rateAnswer: (ref: string, rating: 1 | -1) => request('POST', '/api/ai/rate', { ref, rating }),
+  /** Hands the laptop an answer this phone got from its own key, for its AI log (kept for later when it is away) */
+  recordAnswer: (body: { kind: 'explain' | 'translate'; engine: string; model: string; profile: string; input: unknown; output: unknown }) => orLater('POST', '/api/ai/record', body),
+  /** Settings → Check everything */
+  doctor: () => request<{ name: string; state: 'ok' | 'warn' | 'bad'; detail: string; fix?: string }[]>('GET', '/api/doctor', undefined, {}, 30_000),
+  aiStats: () => request<{ count: number; good: number; bad: number }>('GET', '/api/ai/stats'),
+  /** The AI log as chat examples for training a model (JSON lines) */
+  aiExamples: async (rated: boolean): Promise<Blob> => {
+    const res = await fetch(laptopUrl(`/api/ai/examples${rated ? '?rated=1' : ''}`), { credentials: 'same-origin' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.blob();
+  },
   restore: (id: string) => orLater('POST', `/api/moments/${id}/restore`),
   transcribe: async (id: string) => {
     await handOver(id);

@@ -1,5 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
+import { keepDays } from './retention.ts';
 import express, { type Request, type Response } from 'express';
 import { DATA_DIR, SECRET_SETTINGS, getSettings } from './config.ts';
 import { dayKey } from './analytics.ts';
@@ -10,10 +12,13 @@ import { flush } from './store.ts';
 // Anki history, push keys. Media, dictionaries and manga are large and can be fetched again, so they stay out.
 
 const FILES = ['db.json', 'settings.json', 'known.json', 'vocab-history.json', 'analytics-anki.json', 'manga.json', 'push.json', 'token.txt', 'reading.json', 'prepared.json', 'kanji-cards.json'];
+// Grows with every answer of the AI and is only text: stored packed (about a tenth of the size).
+const PACKED = ['ai-log.jsonl'];
 const SUBFOLDERS = ['subs'];
 // The extra folder is usually synced to a cloud, so it gets no secrets: no access token, no push keys, no API key.
 const SECRET_FILES = new Set(['token.txt', 'push.json']);
-const KEEP_DAYS = 14;
+const KEEP_DAILY = 7;
+const KEEP_WEEKLY = 4;
 const BACKUPS = path.join(DATA_DIR, 'backups');
 
 function copyInto(target: string, withSecrets: boolean): void {
@@ -25,6 +30,10 @@ function copyInto(target: string, withSecrets: boolean): void {
       fs.writeFileSync(path.join(target, f), JSON.stringify({ ...JSON.parse(fs.readFileSync(from, 'utf8')), ...Object.fromEntries(SECRET_SETTINGS.map((k) => [k, ''])) }, null, 2));
     } else fs.copyFileSync(from, path.join(target, f));
   }
+  for (const f of PACKED) {
+    const from = path.join(DATA_DIR, f);
+    if (fs.existsSync(from)) fs.writeFileSync(path.join(target, `${f}.gz`), zlib.gzipSync(fs.readFileSync(from)));
+  }
   for (const d of SUBFOLDERS) {
     const from = path.join(DATA_DIR, d);
     if (fs.existsSync(from)) fs.cpSync(from, path.join(target, d), { recursive: true });
@@ -32,8 +41,9 @@ function copyInto(target: string, withSecrets: boolean): void {
 }
 
 function prune(root: string): void {
-  const dirs = fs.readdirSync(root).filter((n) => /^\d{4}-\d{2}-\d{2}$/.test(n)).sort();
-  for (const old of dirs.slice(0, Math.max(0, dirs.length - KEEP_DAYS))) fs.rmSync(path.join(root, old), { recursive: true, force: true });
+  const dirs = fs.readdirSync(root).filter((n) => /^\d{4}-\d{2}-\d{2}$/.test(n));
+  const keep = new Set(keepDays(dirs, KEEP_DAILY, KEEP_WEEKLY));
+  for (const old of dirs.filter((d) => !keep.has(d))) fs.rmSync(path.join(root, old), { recursive: true, force: true });
 }
 
 /** Writes today's backup (replacing an earlier one of the same day). Returns where it went. */
@@ -59,6 +69,9 @@ export function backupNow(): string[] {
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
+/** The days that have a backup, newest first. */
+export const backupDays = (): string[] => (fs.existsSync(BACKUPS) ? fs.readdirSync(BACKUPS).filter((n) => DAY.test(n)).sort().reverse() : []);
+
 /**
  * Puts a daily backup back into data/ and restarts the server (the running process holds the old state in
  * memory and would overwrite it). The current state is kept first as "before-restore-…", the latest three stay.
@@ -74,6 +87,10 @@ export function restore(day: string): void {
   for (const f of FILES) {
     const from = path.join(source, f);
     if (fs.existsSync(from)) fs.copyFileSync(from, path.join(DATA_DIR, f));
+  }
+  for (const f of PACKED) {
+    const packed = path.join(source, `${f}.gz`);
+    if (fs.existsSync(packed)) fs.writeFileSync(path.join(DATA_DIR, f), zlib.gunzipSync(fs.readFileSync(packed)));
   }
   for (const d of SUBFOLDERS) {
     const from = path.join(source, d);
@@ -111,7 +128,7 @@ const h =
 export function backupRouter(): express.Router {
   const r = express.Router();
   r.use(express.json());
-  r.get('/', h(() => ({ days: fs.existsSync(BACKUPS) ? fs.readdirSync(BACKUPS).filter((n) => DAY.test(n)).sort().reverse() : [], keep: KEEP_DAYS })));
+  r.get('/', h(() => ({ days: backupDays(), keep: KEEP_DAILY + KEEP_WEEKLY })));
   r.post('/', h(() => ({ written: backupNow() })));
   r.post(
     '/restore',

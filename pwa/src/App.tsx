@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, flushOutbox } from './lib/api.ts';
+import { api, connectionHint, flushOutbox, lastLaptopVersion } from './lib/api.ts';
 import { flash, navigate, useEventTick, usePoll, useRoute } from './lib/hooks.ts';
 import { currentSession, pendingPhone, setAnilistToken, syncPhone } from './lib/phone.ts';
 import { hasLaptop, laptopBase, parseLaptop, setLaptop } from './lib/laptop.ts';
@@ -15,6 +15,7 @@ import { Manga } from './screens/Manga.tsx';
 import { Insights } from './screens/Insights.tsx';
 import { Texts } from './screens/Texts.tsx';
 import { Camera } from './screens/Camera.tsx';
+import { Practice } from './screens/Practice.tsx';
 
 // Once per start: the laptop's Anki note type, deck and learner profile, for cards the phone builds itself.
 let learned = false;
@@ -102,7 +103,13 @@ export function App() {
         {offline && paired && page !== 'manga' && page !== 'texts' && page !== 'camera' && !(page === 'watch' && currentSession()) && (
           <div className="banner error" style={{ marginTop: 8 }}>
             <b>Laptop not reachable</b>
-            {page === 'settings' ? '' : ' · Is it switched on? Showing what this phone saved.'}
+            {page === 'settings' ? '' : ' · Showing what this phone saved.'}
+            {connectionHint() && <div>{connectionHint()}</div>}
+            <div className="muted">
+              This is the copy saved on the phone (app v{__APP_VERSION__}
+              {lastLaptopVersion() && lastLaptopVersion() !== __APP_VERSION__ ? `; the laptop last reported v${lastLaptopVersion()}, so this copy may be outdated` : ''}).
+            </div>
+            <button onClick={() => refresh()}>Check again</button>
           </div>
         )}
         {page === 'watch' && <Watch status={status} refreshStatus={refresh} />}
@@ -113,13 +120,14 @@ export function App() {
         {page === 'texts' && <Texts id={arg} />}
         {page === 'camera' && <Camera />}
         {page === 'insights' && <Insights />}
+        {page === 'practice' && <Practice />}
         {page === 'settings' && <Settings status={status} />}
       </main>
       {toast && <div className="toast top">{toast}</div>}
       <nav className="tabbar">
         <div className="tabbar-inner">
           {TABS.map((t) => {
-            const active = page === t.path || (t.path === 'inbox' && page === 'history') || (t.path === 'manga' && (page === 'texts' || page === 'camera'));
+            const active = page === t.path || (t.path === 'inbox' && page === 'history') || (t.path === 'manga' && (page === 'texts' || page === 'camera')) || (t.path === 'insights' && page === 'practice');
             return (
               <a key={t.path} href={`#/${t.path}`} className={active ? 'active' : ''} aria-current={active ? 'page' : undefined}>
                 <Icon name={t.icon} size={25} weight={1.5} />

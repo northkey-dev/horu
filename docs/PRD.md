@@ -196,7 +196,7 @@ The user watches a **real episode** without pausing and presses the button **5 t
 
 **Preparation** ("Before you watch" / "Before you read", each switchable): comprehension and most frequent unknown words of an episode or chapter (also the next one). Filler words (あっ, うーん …) are filtered out; example sentences chosen by length and word form. "Card" adds an Anki card (example line, no audio, no Claude call); words with an existing Horu card are skipped; "Add all" adds all open ones. 5–30 words (default 12).
 
-**Backup:** daily `data/backups/<date>` (14 days), optional extra folder without secrets (no Jimaku key, token, push keys). Restore in Settings: backs up the current state, restores, restarts.
+**Backup:** daily `data/backups/<date>` (last 7 days + one per week for 4 weeks), optional extra folder without secrets (no Jimaku key, token, push keys). Restore in Settings: backs up the current state, restores, restarts.
 
 **Tests:** `npm test` (unit: XP carry-over, streak, level, filler words), `npm run smoke` (throwaway server with its own data folder `data-smoke`, checks the API), plus the big E2E test in `tests/e2e`.
 

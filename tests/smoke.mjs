@@ -276,21 +276,58 @@ try {
   });
 
   await check('security: no key leaves the laptop through the settings', async () => {
-    const keys = { aiApiKey: 'sk-very-long-secret-1234', wanikaniToken: 'wk-very-long-secret-5678', anilistToken: 'short', playerToken: 'user:pass' };
+    const keys = { aiKeyGemini: 'sk-very-long-secret-1234', wanikaniToken: 'wk-very-long-secret-5678', anilistToken: 'short', playerToken: 'user:pass' };
     await call('PUT', '/api/settings', keys);
     const { json: s } = await call('GET', '/api/settings');
-    assert.equal(s.aiApiKey, '••••1234');
+    assert.equal(s.aiKeyGemini, '••••1234');
     assert.equal(s.wanikaniToken, '••••5678');
     assert.equal(s.anilistToken, '••••', 'a short key shows nothing of itself');
     assert.equal(s.playerToken, '••••');
     assert.ok(!JSON.stringify(s).includes('secret'));
     // Sending back what the app was shown changes nothing; a new key does.
     await call('PUT', '/api/settings', s);
-    assert.equal((await call('GET', '/api/settings')).json.aiApiKey, '••••1234');
-    await call('PUT', '/api/settings', { aiApiKey: 'sk-another-long-secret-9999' });
-    assert.equal((await call('GET', '/api/settings')).json.aiApiKey, '••••9999');
-    await call('PUT', '/api/settings', { aiApiKey: '', wanikaniToken: '', anilistToken: '', playerToken: '' });
-    assert.equal((await call('GET', '/api/settings')).json.aiApiKey, '');
+    assert.equal((await call('GET', '/api/settings')).json.aiKeyGemini, '••••1234');
+    await call('PUT', '/api/settings', { aiKeyGemini: 'sk-another-long-secret-9999' });
+    assert.equal((await call('GET', '/api/settings')).json.aiKeyGemini, '••••9999');
+    await call('PUT', '/api/settings', { aiKeyGemini: '', wanikaniToken: '', anilistToken: '', playerToken: '' });
+    assert.equal((await call('GET', '/api/settings')).json.aiKeyGemini, '');
+  });
+
+  await check('AI log: phone answers are kept, rated and exported; order and old settings', async () => {
+    assert.deepEqual((await call('GET', '/api/ai/stats')).json, { count: 0, good: 0, bad: 0 });
+    const answer = { kind: 'translate', engine: 'gemini', model: 'm', profile: 'p', input: { text: '犬が好き', context: [], source: 'x' }, output: { translation: 'I like dogs', notes: '' } };
+    assert.equal((await call('POST', '/api/ai/record', answer)).status, 200);
+    await call('POST', '/api/ai/record', answer); // the same answer twice stays one line
+    assert.equal((await call('GET', '/api/ai/stats')).json.count, 1);
+    assert.equal((await call('POST', '/api/ai/rate', { ref: 'nope', rating: 1 })).status, 400);
+    assert.equal((await call('POST', '/api/ai/record', { kind: 'nonsense' })).status, 400);
+    const examples = await fetch(base + '/api/ai/examples');
+    const lines = (await examples.text()).trim().split('\n').map((l) => JSON.parse(l));
+    assert.equal(lines.length, 1);
+    assert.match(lines[0].messages[0].content, /犬が好き/);
+    assert.equal((await (await fetch(base + '/api/ai/examples?rated=1')).text()).trim(), '', 'nothing is rated good yet');
+    await call('PUT', '/api/settings', { aiEngine: 'gemini', aiFallback: 'claude,ollama' });
+    const { json: s } = await call('GET', '/api/settings');
+    assert.equal(s.aiEngine, 'gemini');
+    assert.equal(s.aiFallback, 'claude,ollama');
+    assert.equal(s.aiApiKey, undefined, 'the old single key setting is gone');
+    await call('PUT', '/api/settings', { aiEngine: 'claude', aiFallback: '' });
+  });
+
+  await check('doctor: every part is listed with a verdict', async () => {
+    const { status, json } = await call('GET', '/api/doctor');
+    assert.equal(status, 200);
+    assert.ok(Array.isArray(json) && json.length >= 6);
+    assert.ok(json.every((c) => ['ok', 'warn', 'bad'].includes(c.state) && c.name && c.detail));
+    assert.ok(json.some((c) => c.name === 'Disk space' && c.state !== 'bad'));
+  });
+
+  await check('share: Japanese sentences of a shared text reach the inbox', async () => {
+    const before = (await call('GET', '/api/inbox')).json.length;
+    const res = await fetch(base + '/api/text/share', { method: 'POST', headers: { 'Content-Type': 'text/plain; charset=utf-8' }, body: '今日は雨だ。でも行く！\nEnglish only' });
+    assert.deepEqual(await res.json(), { count: 2 });
+    assert.equal((await call('GET', '/api/inbox')).json.length, before + 2);
+    assert.equal((await call('POST', '/api/text/share', { text: 'no japanese' })).status, 400);
   });
 
   await check('security: websites cannot act, the app and the extension can', async () => {

@@ -152,11 +152,18 @@ export type Settings = {
   showAdultSources: boolean;
   /** Suwayomi extension repository (index URL) the manga sources come from; Horu ships none */
   mangaExtensionRepo: string;
-  /** Who writes the card explanations on the laptop: Claude Code (`claude -p`) or an HTTP service (shared/ai.ts) */
+  /** The AI the laptop asks first (card explanations and translations): Claude Code (`claude -p`) or an HTTP service (shared/ai.ts) */
   aiEngine: 'claude' | 'gemini' | 'anthropic' | 'openai' | 'ollama';
-  aiApiKey: string;
+  /** The AIs asked, in this order, when the one before fails or is not set up (comma separated engine names) */
+  aiFallback: string;
+  aiKeyGemini: string;
+  aiKeyAnthropic: string;
+  aiKeyOpenai: string;
   /** Empty = the service's default model */
-  aiModel: string;
+  aiModelGemini: string;
+  aiModelAnthropic: string;
+  aiModelOpenai: string;
+  aiModelOllama: string;
   ollamaUrl: string;
   /** Describes the learner in the AI prompt (level, goals) */
   learnerProfile: string;

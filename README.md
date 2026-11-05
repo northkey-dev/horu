@@ -95,7 +95,15 @@ Then:
 
 Phone and laptop sync whenever both are reachable; marks made on the phone alone move to the laptop later.
 
-**Laptop switched off?** The app on your home screen keeps working from what the phone stored and shows *Laptop not reachable*. It starts after about 3 seconds. You can still mark moments, read texts and saved manga chapters, look up words and make `.apkg` cards. Screenshots and audio from the laptop, Whisper, manga sources, text recognition and reminders wait until it is back. Only two things need the laptop on: adding the app to the home screen and opening it once or twice afterwards, so it can store everything (about 40 MB), and getting a new version.
+**Laptop switched off?** The app on your home screen keeps working from what the phone stored and shows *Laptop not reachable* with the likely reason (no internet, no answer, or Tailscale not connected), which app version the saved copy is, and a **Check again** button. It starts after about 3 seconds. You can still mark moments, read texts and saved manga chapters, look up words and make `.apkg` cards. Screenshots and audio from the laptop, Whisper, manga sources, text recognition and reminders wait until it is back. Only two things need the laptop on: adding the app to the home screen and opening it once or twice afterwards, so it can store everything (about 40 MB), and getting a new version.
+
+## Insights and practice
+
+**Insights** shows your streak, daily goal, level, a calendar, last week next to the week before (XP, days studied, new words, reviews and cards), the Anki history and what you mined.
+
+**Practice** (button at the top of Insights → Overview) turns your own marks into drills, on the phone alone:
+- **Words:** the words with a kanji in your marked sentences that you do not know yet, most often seen first. Ten per round: look at the word and its sentence, tap *Show reading and meaning*, then *Again* (it comes back this round) or *Got it*. Three *Got it* over time lift a word to level 3 and take it off the list; *Known* stays your decision (word sheet, or a card).
+- **Kanji to learn first:** the kanji in your marks that no word you know contains, with meaning, readings and an example, the most frequent first.
 
 ## The inbox
 
@@ -103,6 +111,7 @@ Every mark and mined line waits here. Each row shows the line, the word Horu sug
 
 - **List:** tap a row for the full view: choose the line, the word and the audio clip, then *Create card*.
 - **Swipe:** one moment at a time, with line and word already chosen. Swipe right for the card, left to discard. Tap a word to choose another one, *Open* for the full view. The view you used last stays. If your AI route is *Copy prompt*, or cards go to AnkiMobile, a swipe to the right opens the full view, because those need a tap there.
+- **Search:** with more than five rows, a box above the list finds a moment by any word of its lines, the card's word or where it is from (every word you type has to match). *History* has the same box.
 - **Edit** (in the list): tick marks you made by accident and discard them together. Discarded moments stay in *History* for a few days. A mark only this phone knows (the laptop was away) is gone right away.
 
 ## Furigana on the cards
@@ -401,7 +410,7 @@ docker compose up -d
 docker compose logs -f horu
 ```
 
-Back up the `data/` folder (Horu also writes 14 daily backups into `data/backups`). The version number at the top of **Settings** shows `App` and `Laptop`; on a Pi the second line is the Pi's Horu.
+Back up the `data/` folder (Horu also writes a daily backup into `data/backups`: the last 7 days and one per week for the 4 weeks before). The version number at the top of **Settings** shows `App` and `Laptop`; on a Pi the second line is the Pi's Horu.
 
 ### Home Assistant and other containers
 
@@ -477,6 +486,7 @@ Every option in **Settings**, in the order of the screen. Settings that belong t
 | Section | What you see |
 |---|---|
 | **Status** | Laptop version, Anki (connected / starting / offline; Anki starts by itself when a card is made), Chrome extension (recording / idle / not connected), Jimaku (key set), Whisper (ready). |
+| **Check everything** | Under *Status*: runs the laptop's checks and lists each part with ✓ / ! / ✕ and what to do about it: Horu, Tailscale (running, and passing requests to Horu), starting with Windows, Anki, each AI of your order (key or program present), Whisper, dictionary, free disk space and the age of the last backup. |
 | **Laptop modules** | Which optional parts are installed: Whisper, Manga sources, Text recognition, Claude Code, Ollama. Add one later with `scripts\install.ps1 -Modules whisper,manga,claude,ollama`. |
 
 ### Laptop settings
@@ -490,10 +500,9 @@ Every option in **Settings**, in the order of the screen. Settings that belong t
 | **Subtitles** | Jimaku API key | The laptop's key for Japanese subtitles (free, jimaku.cc → account). |
 | **Cards on the laptop** | Anki deck (Anime Mining) | The deck cards are added to. |
 | | New cards per day (10) | Applied once, when the deck is created. Change it later in Anki's deck options. |
-| | Explanations by (Claude Code) | *Claude Code* (`claude -p`, your subscription), *Gemini* (free key), *Anthropic* or *OpenAI* (your key), *Ollama* (a local model on the laptop, free). |
-| | Claude model (sonnet) | `sonnet`, `opus` or `haiku` (only for Claude Code). |
-| | API key / Model / Ollama address | Key for Gemini, Anthropic or OpenAI (stays on the laptop and is left out of the extra backup copy); optional model name; address of Ollama (default `http://127.0.0.1:11434`). |
+| | AI order | The AIs that write explanations and translations, in the order they are asked: *Claude Code* (`claude -p`, your subscription), *Gemini* (free key), *Anthropic* or *OpenAI* (your key), *Ollama* (a local model, free). The first one answers; when it is down, out of quota or has no key, the next one does. Move one up or down with the arrows (put the one whose answers you like best first), *Remove* it or *Add* another. Each has its own key, model and, for Ollama, address (default `http://127.0.0.1:11434`); keys stay on the laptop and are left out of the extra backup copy. |
 | | About you (for the AI) | Level and goals, so explanations fit. Phones use it too unless they set their own. |
+| | AI answers are kept | Every explanation and translation the laptop's AI writes is saved in `data/ai-log.jsonl` (one line each: the text that went in, the answer, which AI). Asking for the same card text or line again is answered from there at once, without the AI. Another AI, model or *About you* text asks again. Under a translation, **Good** / **Poor** rate it and **Ask again** gets a new one from the AI. Answers from a key on the phone are added too once the laptop is reachable. Below the AI order, Settings counts the answers and offers **Download as training examples** (all, or only those marked good) as a `.jsonl` file of chats, ready to teach a small local model; answers marked poor are never in it. The file is part of the daily backup. |
 | | Screenshot on anime cards (off) | Off: anime cards only get sentence and audio. Manga cards always get their panel. |
 | | Kanji cards (off) | Also adds one card per new kanji of a target word, in the subdeck `::Kanji`. |
 | **Preparation** | Before you watch (on) | On the Watch screen: how much of the episode you will understand and its key new words. |
@@ -503,7 +512,7 @@ Every option in **Settings**, in the order of the screen. Settings that belong t
 | | Keep finished, days (7) | After a card is made or a moment is discarded it stays in History and can be put back for this long. Its audio and pictures are removed afterwards. |
 | | Whisper model (medium) | `small` is fast, `medium` is better, `large-v3` is best but slow on a plain CPU. |
 | | Pick the line by ear (on) | Whisper listens to every mark and preselects the subtitle line that was actually spoken. |
-| **Backup** | Extra copy to | Optional folder (for example in OneDrive) that gets a copy of the daily backup. It leaves out your Jimaku key, access token and push keys. Horu always keeps the last 14 days in `data/backups`. |
+| **Backup** | Extra copy to | Optional folder (for example in OneDrive) that gets a copy of the daily backup. It leaves out your Jimaku key, access token and push keys. Horu keeps the last 7 days and one per week for the 4 weeks before in `data/backups` (at most 11 copies, the AI log packed). *Restore* can go back to any of them. |
 | | Back up now / Restore | Writes a backup right away. *Restore* picks a day, replaces your current data with it and restarts Horu; the current state is kept as a safety copy. |
 | **Known words from Anki** | Anki search (empty) | Which reviewed cards count as known. Empty means all decks. Example: `deck:Japanisch*`. |
 | | Count JLPT N5 and N4 as known (on) | Treats the N5 and N4 vocabulary as known, so previews and suggestions skip it. |
@@ -527,6 +536,7 @@ Every option in **Settings**, in the order of the screen. Settings that belong t
 |---|---|
 | **Appearance** | *Automatic* follows the phone, or force *Dark* or *Light*. |
 | **Install on iPhone** | Short steps: open the app in Safari → Share → Add to Home Screen; with a laptop install Tailscale on both and run `tailscale serve --bg 7317`. |
+| **Share Japanese text from any app** | An iOS Shortcut for the Share sheet (Safari does not offer web apps there, so this is the way): *Receive* text from the Share sheet → *Get contents of URL* with `https://<laptop>.ts.net/api/text/share`, method POST, request body = the shared text (or JSON `{"text": …, "title": …}`). Every Japanese sentence of it (at most 30) lands in the inbox as its own line. |
 | **Japanese text anywhere on the iPhone** | Steps for an iOS Shortcut: Take Screenshot → send it to the laptop's `/api/screen` → show the result, started with Back Tap. After a few seconds you see the text with readings and new words, and the screenshot also lands in the inbox. Needs the laptop to be on. |
 
 ### Chrome extension

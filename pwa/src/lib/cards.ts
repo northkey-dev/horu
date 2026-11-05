@@ -1,4 +1,4 @@
-import { chatPrompt, DEFAULT_PROFILE, explainWith, translatePrompt, translateWith, type AiService, type ExplainInput, type Explanation, type TranslateInput, type Translation } from '../../../shared/ai.ts';
+import { chatPrompt, DEFAULT_MODELS, DEFAULT_PROFILE, explainWith, translatePrompt, translateWith, type AiService, type ExplainInput, type Explanation, type TranslateInput, type Translation } from '../../../shared/ai.ts';
 import { escapeHtml, highlight, slug } from '../../../shared/furigana.ts';
 import { BACK, CSS, FIELDS, FRONT, MODEL_NAME } from '../../../shared/notetype.ts';
 import type { CardRequest, Moment, Settings } from '../../../shared/types.ts';
@@ -95,7 +95,10 @@ export const promptFor = (moment: Moment, req: CardRequest) => chatPrompt(explai
 
 export async function explainOnPhone(service: KeyService, moment: Moment, req: CardRequest): Promise<Explanation> {
   const p = cardPrefs();
-  return explainWith({ service, key: p.keys[service] ?? '', model: p.models[service] }, explainInput(moment, req), profile(p));
+  const input = explainInput(moment, req);
+  const output = await explainWith({ service, key: p.keys[service] ?? '', model: p.models[service] }, input, profile(p));
+  void api.recordAnswer({ kind: 'explain', engine: service, model: p.models[service]?.trim() || DEFAULT_MODELS[service], profile: profile(p), input, output }).catch(() => undefined);
+  return output;
 }
 
 /**
@@ -103,15 +106,15 @@ export async function explainOnPhone(service: KeyService, moment: Moment, req: C
  * Settings, else the laptop's AI when it is reachable, else the first key on the phone. Without any, the
  * prompt is copied for a chat app and 'copied' comes back.
  */
-export async function translateLine(line: TranslateInput): Promise<Translation | 'copied'> {
+export async function translateLine(line: TranslateInput, fresh = false): Promise<Translation | 'copied'> {
   const p = cardPrefs();
   const input = { ...line, wordByWord: wordByWord() };
   const key = `${input.wordByWord ? 'w' : ''}${input.text}`;
   const cache = `horu-tr:${key}`;
-  const running = translating.get(key);
+  const running = fresh ? undefined : translating.get(key);
   if (running) return running;
   try {
-    const hit = sessionStorage.getItem(cache);
+    const hit = fresh ? null : sessionStorage.getItem(cache);
     if (hit) return JSON.parse(hit) as Translation;
   } catch {
     // storage blocked
@@ -121,8 +124,9 @@ export async function translateLine(line: TranslateInput): Promise<Translation |
     await navigator.clipboard.writeText(`${translatePrompt(input, profile(p))}\n\nAnswer with only the JSON object, no other text.`);
     return 'copied';
   }
-  const run = (service === 'laptop' ? api.translate(input) : translateWith({ service, key: p.keys[service] ?? '', model: p.models[service] }, input, profile(p)))
+  const run = (service === 'laptop' ? api.translate({ ...input, fresh }) : translateWith({ service, key: p.keys[service] ?? '', model: p.models[service] }, input, profile(p)))
     .then((result) => {
+      if (service !== 'laptop') void api.recordAnswer({ kind: 'translate', engine: service, model: p.models[service]?.trim() || DEFAULT_MODELS[service], profile: profile(p), input, output: result }).catch(() => undefined);
       try {
         sessionStorage.setItem(cache, JSON.stringify(result));
       } catch {

@@ -3,6 +3,7 @@ import { TokenText } from './TokenText.tsx';
 import { Sheet } from './Sheet.tsx';
 import { SpeakButton } from './SpeakButton.tsx';
 import { translateAhead, translateLine } from '../lib/cards.ts';
+import { api } from '../lib/api.ts';
 import type { Translation } from '../../../shared/ai.ts';
 import type { Printed } from '../../../shared/readings.ts';
 
@@ -33,6 +34,7 @@ type Props = {
 export function TextSheet({ text, readings, edited, source, context, onEdit, onMine, onReframe, onClose }: Props) {
   const [translation, setTranslation] = useState<Translation | 'busy' | 'copied' | { error: string }>();
   const [draft, setDraft] = useState<string>();
+  const [rated, setRated] = useState<1 | -1>();
 
   // A moment after opening, so flipping through bubbles costs nothing. Closing the sheet cancels it.
   useEffect(() => {
@@ -41,13 +43,20 @@ export function TextSheet({ text, readings, edited, source, context, onEdit, onM
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text]);
 
-  async function translate() {
+  async function translate(fresh = false) {
     setTranslation('busy');
+    setRated(undefined);
     try {
-      setTranslation(await translateLine({ text, context, source, readings }));
+      setTranslation(await translateLine({ text, context, source, readings }, fresh));
     } catch (e) {
       setTranslation({ error: (e as Error).message });
     }
+  }
+
+  // A mark on the answer goes into the laptop's AI log; "Poor" answers stay out of the training examples.
+  function rate(ref: string, rating: 1 | -1) {
+    setRated(rating);
+    api.rateAnswer(ref, rating).catch(() => setRated(undefined));
   }
 
   function save(value: string | undefined) {
@@ -113,6 +122,21 @@ export function TextSheet({ text, readings, edited, source, context, onEdit, onM
                   ))}
                 </dl>
               )}
+              <div className="row" style={{ gap: 4, flexWrap: 'wrap' }}>
+                {translation.ref && (
+                  <>
+                    <button className={`ghost small${rated === 1 ? ' on' : ''}`} onClick={() => rate(translation.ref!, 1)}>
+                      Good
+                    </button>
+                    <button className={`ghost small${rated === -1 ? ' on' : ''}`} onClick={() => rate(translation.ref!, -1)}>
+                      Poor
+                    </button>
+                  </>
+                )}
+                <button className="ghost small" onClick={() => translate(true)}>
+                  Ask again
+                </button>
+              </div>
             </>
           )}
         </div>
@@ -120,7 +144,7 @@ export function TextSheet({ text, readings, edited, source, context, onEdit, onM
       {draft === undefined && (
         <>
           <div className="row" style={{ marginTop: 12, gap: 8 }}>
-            <button className="grow" disabled={translation === 'busy'} onClick={translate}>
+            <button className="grow" disabled={translation === 'busy'} onClick={() => translate()}>
               {translation === 'busy' ? <span className="spinner" /> : 'Translate'}
             </button>
             <button className="primary grow" onClick={() => onMine()}>

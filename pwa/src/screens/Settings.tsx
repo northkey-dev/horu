@@ -10,7 +10,8 @@ import { Dictionaries, KnownWordsImport } from '../components/KnownWords.tsx';
 import { AniList, ImportSentences, RemoteMark } from '../components/Integrations.tsx';
 import { shareFile } from '../lib/cards.ts';
 import { laptopUrl } from '../lib/laptop.ts';
-import { AI_LABELS, DEFAULT_MODELS } from '../../../shared/ai.ts';
+import { Doctor } from '../components/Doctor.tsx';
+import { AiLog, AiOrder } from '../components/AiOrder.tsx';
 import { hasLaptop, laptopBase } from '../lib/laptop.ts';
 import { disablePush, enablePush, pushEnabled, pushSupported } from '../lib/push.ts';
 import { readTheme, setTheme as saveTheme, type ThemePref } from '../lib/theme.ts';
@@ -211,6 +212,7 @@ export function Settings({ status }: { status?: Status }) {
         <StatusRow label="Whisper" ok={status?.whisperAvailable} value={status?.whisperAvailable ? 'Ready' : 'Unavailable'} />
       </div>
       <p className="footnote">Dictionary: {dict}. Anki is started automatically when a card is created.</p>
+      <Doctor online={Boolean(status)} />
 
       {modules && (
         <>
@@ -267,25 +269,8 @@ export function Settings({ status }: { status?: Status }) {
           <div className="group">
             {field('deckName', 'Anki deck')}
             {field('newCardsPerDay', 'New cards per day', 'number', 'Applied when the deck is created; later change it in Anki’s deck options.')}
-            <label className="field stacked">
-              <span>Explanations by</span>
-              <select value={s.aiEngine} onChange={(e) => update({ aiEngine: e.target.value as S['aiEngine'] })}>
-                <option value="claude">Claude Code (claude -p, your subscription)</option>
-                <option value="gemini">{AI_LABELS.gemini}</option>
-                <option value="anthropic">{AI_LABELS.anthropic}</option>
-                <option value="openai">{AI_LABELS.openai}</option>
-                <option value="ollama">{AI_LABELS.ollama}</option>
-              </select>
-            </label>
-            {s.aiEngine === 'claude' && field('claudeModel', 'Claude model', 'text', 'sonnet, opus or haiku.')}
-            {(s.aiEngine === 'gemini' || s.aiEngine === 'anthropic' || s.aiEngine === 'openai') && field('aiApiKey', 'API key', 'text', 'Stays on the laptop and is left out of the extra backup copy.', true)}
-            {s.aiEngine !== 'claude' && (
-              <label className="field">
-                <span>Model</span>
-                <input autoCapitalize="off" autoCorrect="off" spellCheck={false} placeholder={DEFAULT_MODELS[s.aiEngine]} value={s.aiModel} onChange={(e) => update({ aiModel: e.target.value })} />
-              </label>
-            )}
-            {s.aiEngine === 'ollama' && field('ollamaUrl', 'Ollama address', 'text', 'Ollama runs models on this laptop for free (ollama.com).', true)}
+            <AiOrder s={s} update={update} />
+            <AiLog online={online} />
             <label className="field stacked">
               <span>About you (for the AI)</span>
               <textarea rows={3} value={s.learnerProfile} onChange={(e) => update({ learnerProfile: e.target.value })} />
@@ -314,7 +299,7 @@ export function Settings({ status }: { status?: Status }) {
 
           <h2>Backup</h2>
           <div className="group">
-            {field('backupFolder', 'Extra copy to', 'text', 'Optional, e.g. a OneDrive folder. Horu always keeps the last 14 days in data/backups. The extra copy leaves out your Jimaku key, access token and push keys.', true)}
+            {field('backupFolder', 'Extra copy to', 'text', 'Optional, e.g. a OneDrive folder. Horu keeps the last 7 days and one per week for the 4 weeks before in data/backups. The extra copy leaves out your Jimaku key, access token and push keys.', true)}
             <button className="list-item action-row" onClick={backup}>
               Back up now
             </button>

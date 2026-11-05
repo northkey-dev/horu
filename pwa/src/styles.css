@@ -718,3 +718,9 @@ button.continue .small { opacity: 0.7; font-size: 13px; }
 /* the list that opens from a dropdown is drawn by the system: give it solid colours of the theme (the select itself
    is see-through, so light text would otherwise land on the system's white) */
 select option, select optgroup { background-color: var(--bg); color: var(--ink); }
+
+.ai-engine { border-top: var(--hair) solid var(--line); }
+.ai-engine .cell { gap: 6px; }
+button.ghost.on { color: var(--accent); font-weight: 600; }
+
+.search-box { width: 100%; box-sizing: border-box; margin: 4px 0 12px; }
