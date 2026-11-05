@@ -1,5 +1,9 @@
+import { useEffect, useState } from 'react';
 import { api, imageUrl } from '../lib/api.ts';
-import { navigate, useMedia, usePoll } from '../lib/hooks.ts';
+import { flash, navigate, useMedia, usePoll } from '../lib/hooks.ts';
+import { defaultLine, haveCards, planFor, planKey } from '../lib/inbox.ts';
+import { inboxView, setInboxView } from '../lib/phone.ts';
+import { InboxStack } from './InboxStack.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { Nav } from '../components/Nav.tsx';
 import type { Moment } from '../../../shared/types.ts';
@@ -22,12 +26,82 @@ function ago(iso: string): string {
   return `${Math.round(h / 24)} d ago`;
 }
 
+/** The word each moment would get, and which of those words already have a card. */
+function useWords(moments?: Moment[]) {
+  const [found, setFound] = useState<{ words: Record<string, string>; cards: Set<string> }>({ words: {}, cards: new Set() });
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const words: Record<string, string> = {};
+      for (const m of moments ?? []) {
+        if (m.status !== 'ready' && m.status !== 'error') continue;
+        const form = (await planFor(m)).target?.form;
+        if (form) words[m.id] = form;
+      }
+      if (!alive) return;
+      setFound((f) => ({ ...f, words }));
+      const cards = await haveCards([...new Set(Object.values(words))]);
+      if (alive) setFound({ words, cards });
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [moments?.map(planKey).join()]);
+  return found;
+}
+
 export function Inbox() {
-  const { data, error } = usePoll(() => api.inbox(), 3000);
+  const { data, error, refresh } = usePoll(() => api.inbox(), 3000);
+  const [view, setView] = useState(inboxView);
+  const [editing, setEditing] = useState(false);
+  const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const { words, cards } = useWords(data);
+
+  const canGo = (m: Moment) => m.status !== 'creating';
+  const chosen = (data ?? []).filter((m) => picked.has(m.id) && canGo(m));
+  const all = (data ?? []).filter(canGo);
+
+  function show(next: 'list' | 'swipe') {
+    setView(next);
+    setInboxView(next);
+    setEditing(false);
+  }
+
+  function edit(on: boolean) {
+    setEditing(on);
+    setPicked(new Set());
+  }
+
+  function toggle(id: string) {
+    const next = new Set(picked);
+    if (!next.delete(id)) next.add(id);
+    setPicked(next);
+  }
+
+  async function discard() {
+    setBusy(true);
+    let done = 0;
+    try {
+      // One after the other: what cannot be sent yet is queued in order.
+      for (const m of chosen) {
+        await api.discard(m.id);
+        done++;
+      }
+      flash(`${done} discarded · still in History for a few days`);
+      edit(false);
+    } catch (e) {
+      flash((e as Error).message);
+    }
+    setBusy(false);
+    refresh();
+  }
+
   return (
     <div>
       <Nav>
-        <button onClick={() => navigate('history')}>History</button>
+        {!!data?.length && view === 'list' && <button onClick={() => edit(!editing)}>{editing ? 'Done' : 'Edit'}</button>}
+        {!editing && <button onClick={() => navigate('history')}>History</button>}
       </Nav>
       <h1>Inbox</h1>
       {error && <div className="banner error">{error.message}</div>}
@@ -43,25 +117,51 @@ export function Inbox() {
       {!!data?.length && (
         <>
           <h2>{data.length} to review</h2>
-          <div className="group">
-            {data.map((m) => (
-              <InboxRow key={m.id} m={m} />
-            ))}
-          </div>
+          {!editing && (
+            <div className="segmented inbox-view">
+              <button className={view === 'list' ? 'on' : ''} onClick={() => show('list')}>
+                List
+              </button>
+              <button className={view === 'swipe' ? 'on' : ''} onClick={() => show('swipe')}>
+                Swipe
+              </button>
+            </div>
+          )}
+          {view === 'swipe' ? (
+            <InboxStack moments={data} refresh={refresh} />
+          ) : (
+            <div className="group">
+              {data.map((m) => (
+                <InboxRow key={m.id} m={m} word={words[m.id]} hasCard={cards.has(words[m.id])} picking={editing} picked={picked.has(m.id)} disabled={editing && !canGo(m)} onPick={() => toggle(m.id)} />
+              ))}
+            </div>
+          )}
+          {editing && (
+            <div className="action-bar">
+              <button disabled={busy} onClick={() => setPicked(new Set(chosen.length === all.length ? [] : all.map((m) => m.id)))}>
+                {chosen.length === all.length ? 'Select none' : 'Select all'}
+              </button>
+              <button className="danger" disabled={busy || !chosen.length} onClick={() => void discard()}>
+                {chosen.length ? `Discard ${chosen.length}` : 'Discard'}
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>
   );
 }
 
-function InboxRow({ m }: { m: Moment }) {
-  const idx = m.matchedIndex ?? (m.kind === 'anime' ? m.candidates.length - 1 : 0);
-  const preview = m.candidates[idx]?.text ?? m.candidates[0]?.text;
+type RowProps = { m: Moment; word?: string; hasCard: boolean; picking: boolean; picked: boolean; disabled: boolean; onPick: () => void };
+
+function InboxRow({ m, word, hasCard, picking, picked, disabled, onPick }: RowProps) {
+  const preview = m.candidates[defaultLine(m, m.candidates)]?.text ?? m.candidates[0]?.text;
   const status = STATUS_LABEL[m.status];
   const busy = Boolean(status) && m.status !== 'error';
   return (
-    <button className="list-item" onClick={() => navigate(`inbox/${m.id}`)}>
+    <button className="list-item" disabled={disabled} aria-pressed={picking ? picked : undefined} onClick={() => (picking ? onPick() : navigate(`inbox/${m.id}`))}>
       <div className="inbox-row">
+        {picking && <span className="pick">{picked && <Icon name="check" size={14} weight={2.4} />}</span>}
         {m.hasImage ? (
           <Thumb id={m.id} />
         ) : (
@@ -73,6 +173,8 @@ function InboxRow({ m }: { m: Moment }) {
           <div className="line jp ellipsis">{preview ?? <span className="faint">No text yet</span>}</div>
           <div className="meta meta-row">
             {busy && <span className="spinner" />}
+            {word && <span className="inbox-word jp">{word}</span>}
+            {word && hasCard && <span className="has-card-tag">has a card</span>}
             <span className="ellipsis">
               {m.status === 'error' && <span className="label-bad">{status} · </span>}
               {busy && `${status} · `}
@@ -80,7 +182,7 @@ function InboxRow({ m }: { m: Moment }) {
             </span>
           </div>
         </div>
-        <Icon name="chevron" size={18} weight={2} className="chev" />
+        {!picking && <Icon name="chevron" size={18} weight={2} className="chev" />}
       </div>
     </button>
   );

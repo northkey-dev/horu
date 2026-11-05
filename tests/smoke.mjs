@@ -353,6 +353,11 @@ try {
     assert.equal(typeof (await call('GET', '/api/modules')).json.voice, 'boolean');
   });
 
+  await check('a closed Anki does not stop the check for existing cards', async () => {
+    assert.deepEqual((await call('POST', '/api/anki/has-cards', { words: ['決まる'] })).json, { existing: [] });
+    assert.deepEqual((await call('POST', '/api/anki/has-cards', { words: 'x' })).json, { existing: [] });
+  });
+
   await check('pwa shell is served', async () => {
     const res = await fetch(base + '/');
     assert.ok([200, 503].includes(res.status));

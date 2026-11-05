@@ -68,6 +68,9 @@ export const setTranslatesAhead = (on: boolean) => write('horu-translate-ahead',
 /** A translation also goes through the line word by word. */
 export const wordByWord = () => read<boolean>('horu-word-by-word', true);
 export const setWordByWord = (on: boolean) => write('horu-word-by-word', on);
+/** The inbox as a list, or one moment at a time. */
+export const inboxView = () => read<'list' | 'swipe'>('horu-inbox-view', 'list');
+export const setInboxView = (view: 'list' | 'swipe') => write('horu-inbox-view', view);
 export const anilistToken = () => read<string>('horu-anilist', '');
 export const setAnilistToken = (token: string) => write('horu-anilist', token.trim());
 

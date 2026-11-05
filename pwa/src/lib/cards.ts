@@ -337,6 +337,9 @@ export function queuedCount(): number {
   return Number(localStorage.getItem(COUNT) ?? 0) || 0;
 }
 
+/** Words with a card that waits on this phone or was exported from it. */
+export const queuedWords = async () => (await queue()).map((c) => c.word);
+
 export async function queueSummary(): Promise<{ waiting: number; exported: number; words: string[] }> {
   const list = await queue();
   const waiting = list.filter((c) => !c.exportedAt);

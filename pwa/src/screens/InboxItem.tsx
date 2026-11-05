@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, audioUrl, imageUrl, laptopMakesCards, laptopUp } from '../lib/api.ts';
-import { aiRoute, cardRoute, explainOnPhone, makeCardOnPhone, promptFor } from '../lib/cards.ts';
+import { aiRoute, cardRoute, promptFor } from '../lib/cards.ts';
+import { clipOf, defaultLine, haveCards, sendCard, suggestFor } from '../lib/inbox.ts';
 import { parseExplanation, type Explanation } from '../../../shared/ai.ts';
 import { Sheet } from '../components/Sheet.tsx';
-import { cardMadeFor, knownCheck } from '../lib/words.ts';
 import { flash, formatTime, navigate, useMedia, usePoll } from '../lib/hooks.ts';
-import { suggestTarget, type Token } from '../lib/japanese.ts';
+import type { Token } from '../lib/japanese.ts';
 import { TokenText } from '../components/TokenText.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { Nav } from '../components/Nav.tsx';
@@ -32,18 +32,6 @@ function Head({ label }: { label: string }) {
   return <Nav back="Inbox" to="inbox" title={label} />;
 }
 
-/** The line the user most likely reacted to: whisper's match, else the last one that started before the press. */
-function defaultLine(m: Moment, lines: Candidate[]): number {
-  if (!lines.length) return -1;
-  if (m.matchedIndex !== undefined && lines === m.candidates && m.matchedIndex < lines.length) return m.matchedIndex;
-  if (m.videoTime === undefined) return m.kind === 'anime' ? lines.length - 1 : 0;
-  let idx = 0;
-  lines.forEach((c, i) => {
-    if (c.start <= m.videoTime! - 0.3) idx = i;
-  });
-  return idx;
-}
-
 function Editor({ moment, refresh }: { moment: Moment; refresh: () => void }) {
   const imageSrc = useMedia(imageUrl(moment.id));
   const audioSrc = useMedia(audioUrl(moment.id));
@@ -62,6 +50,7 @@ function Editor({ moment, refresh }: { moment: Moment; refresh: () => void }) {
   const [error, setError] = useState<string>();
   const [ask, setAsk] = useState<{ req: CardRequest; route: Route }>();
   const [ankiLink, setAnkiLink] = useState<string>();
+  const [hasCard, setHasCard] = useState(false);
   const audio = useRef<HTMLAudioElement>(null);
   const stopAt = useRef<number>();
 
@@ -79,29 +68,27 @@ function Editor({ moment, refresh }: { moment: Moment; refresh: () => void }) {
     const line = lines[sel];
     setSentence(line?.text.replace(/\n/g, '') ?? '');
     setTarget(undefined);
-    // Subtitles from another release can run early/late; whisper measured by how much (whisper lines are in audio time already).
-    const shift = line?.source === 'subs' ? (moment.syncOffset ?? 0) : 0;
-    setClip(line && line.end > line.start ? { start: line.start + shift - 0.25, end: line.end + shift + 0.35 } : undefined);
+    setClip(clipOf(moment, line));
   }, [sel, lines]);
 
   useEffect(() => {
     if (!tokens) return;
-    // Prefer words the user does not know yet (Anki decks + JLPT baseline).
-    knownCheck([...new Set(tokens.flatMap((t) => [t.base, t.surface]))])
-      .then((map) => new Set(Object.keys(map).filter((w) => map[w])))
-      .catch(() => undefined)
-      .then((known) => {
-        // The word picked while reading comes first.
-        const hint = moment.targetHint;
-        const token = hint && tokens.find((t) => t.base === hint || t.surface === hint);
-        if (token) return { start: token.start, end: token.end, form: token.base };
-        const at = hint ? sentence.indexOf(hint) : -1;
-        return at >= 0 ? { start: at, end: at + hint!.length, form: hint! } : suggestTarget(tokens, known);
-      })
-      .then(setSuggested);
+    void suggestFor(tokens, sentence, moment.targetHint).then(setSuggested);
   }, [tokens]);
 
   const effectiveTarget = target ?? suggested;
+
+  useEffect(() => {
+    const word = effectiveTarget?.form;
+    setHasCard(false);
+    if (!word || finished) return;
+    let alive = true;
+    void haveCards([word]).then((have) => alive && setHasCard(have.has(word)));
+    return () => {
+      alive = false;
+    };
+  }, [effectiveTarget?.form]);
+
   const context = useMemo(() => {
     if (!withContext || sel < 0) return [];
     return [lines[sel - 1]?.text, lines[sel + 1]?.text].filter((t): t is string => Boolean(t)).map((t) => t.replace(/\n/g, ' '));
@@ -147,30 +134,16 @@ function Editor({ moment, refresh }: { moment: Moment; refresh: () => void }) {
     await finish(req, route, ai);
   }
 
-  /** Gets the explanation (unless the laptop asks its own AI) and makes the card where Settings → Cards says. */
   async function finish(req: CardRequest, route: Route, ai: ReturnType<typeof aiRoute>, explanation?: Explanation) {
     setBusy(true);
     setError(undefined);
     try {
-      if (!explanation && (ai === 'gemini' || ai === 'anthropic' || ai === 'openai')) {
-        setWorking('Asking the AI for the explanation…');
-        explanation = await explainOnPhone(ai, moment, req);
-      }
-      const word = effectiveTarget?.form || targetText;
-      if (route === 'laptop') {
-        await api.createCard(moment.id, { ...req, explanation, skipAi: ai === 'none' });
-        flash(`Card for ${word} is being created`);
-        return await goNext();
-      }
-      setWorking('Making the card on this phone…');
-      const card = await makeCardOnPhone(moment, req, explanation, route, { audio: audioUrl(moment.id), image: imageUrl(moment.id) });
-      await api.cardDone(moment.id, { cardSentence: card.sentence, cardTarget: card.word });
-      void cardMadeFor(card.word);
-      if (card.link) {
+      const made = await sendCard(moment, req, effectiveTarget?.form || targetText, route, ai, explanation, setWorking);
+      if (made.link) {
         setWorking(undefined);
-        return setAnkiLink(card.link);
+        return setAnkiLink(made.link);
       }
-      flash(route === 'apkg' ? `Card for ${card.word} saved · export it in Settings → Cards` : `Card for ${card.word} added to Anki`);
+      flash(made.message);
       await goNext();
     } catch (e) {
       setError((e as Error).message);
@@ -330,6 +303,7 @@ function Editor({ moment, refresh }: { moment: Moment; refresh: () => void }) {
                   <span>Tap a word to look it up and set it as target.</span>
                 )}
               </div>
+              {hasCard && <div className="has-card">You already have a card for this word.</div>}
             </div>
           )}
 

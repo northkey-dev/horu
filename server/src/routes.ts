@@ -8,7 +8,7 @@ import QRCode from 'qrcode';
 import http from 'node:http';
 import { ACCESS_TOKEN, APP_URL, PORT, ROOT_DIR, VERSION, getSettings, maskedSettings, updateSettings } from './config.ts';
 import os from 'node:os';
-import { ankiOnline, isAnkiStarting, noteTypeId } from './anki.ts';
+import { ankiOnline, existingTargets, isAnkiStarting, noteTypeId } from './anki.ts';
 import { notify } from './webhook.ts';
 import { importDict, listDicts, lookup, removeDict } from './dicts.ts';
 import { nowPlaying, playerConfigured } from './players.ts';
@@ -375,6 +375,18 @@ export function apiRouter(): express.Router {
   );
   // So .apkg files built on the phone use the same note type as the laptop's Anki.
   r.get('/anki/notetype', h(async () => ({ id: await noteTypeId().catch(() => undefined), deck: getSettings().deckName })));
+  // A card made on the phone may not be in Anki yet, and Anki may be closed: finished moments count too.
+  r.post(
+    '/anki/has-cards',
+    h(async (req) => {
+      const { words } = req.body as { words?: unknown };
+      const asked = (Array.isArray(words) ? words : []).filter((w): w is string => typeof w === 'string' && w.length > 0).slice(0, 200);
+      const made = new Set(store.listMoments((m) => m.status === 'done').map((m) => m.cardTarget));
+      const noAnswer = new Promise<Set<string>>((done) => setTimeout(() => done(new Set()), 3000).unref());
+      const inAnki = await Promise.race([existingTargets(asked).catch(() => new Set<string>()), noAnswer]);
+      return { existing: asked.filter((w) => made.has(w) || inAnki.has(w)) };
+    }),
+  );
   r.post(
     '/moments/:id/discard',
     h((req) => {

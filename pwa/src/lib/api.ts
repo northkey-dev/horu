@@ -231,6 +231,7 @@ export const api = {
     await patchMirror<Moment>(`moment:${id}`, (m) => ({ ...m, status: 'done', ...card }));
   },
   ankiNoteType: () => request<{ id?: number; deck: string }>('GET', '/api/anki/notetype', undefined, {}, 20_000),
+  hasCards: (words: string[]) => request<{ existing: string[] }>('POST', '/api/anki/has-cards', { words }).then((r) => r.existing),
   translate: (input: TranslateInput) => request<Translation>('POST', '/api/translate', input, {}, SLOW),
   restore: (id: string) => orLater('POST', `/api/moments/${id}/restore`),
   transcribe: async (id: string) => {

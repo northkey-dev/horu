@@ -97,6 +97,14 @@ Phone and laptop sync whenever both are reachable; marks made on the phone alone
 
 **Laptop switched off?** The app on your home screen keeps working from what the phone stored and shows *Laptop not reachable*. It starts after about 3 seconds. You can still mark moments, read texts and saved manga chapters, look up words and make `.apkg` cards. Screenshots and audio from the laptop, Whisper, manga sources, text recognition and reminders wait until it is back. Only two things need the laptop on: adding the app to the home screen and opening it once or twice afterwards, so it can store everything (about 40 MB), and getting a new version.
 
+## The inbox
+
+Every mark and mined line waits here. Each row shows the line, the word Horu suggests to learn and where it is from. **has a card** means you already have a card for that word; the full view says so too. Horu checks your *Horu Sentence* cards in Anki and what you made in the last days, so words from other note types are not counted.
+
+- **List:** tap a row for the full view: choose the line, the word and the audio clip, then *Create card*.
+- **Swipe:** one moment at a time, with line and word already chosen. Swipe right for the card, left to discard. Tap a word to choose another one, *Open* for the full view. The view you used last stays. If your AI route is *Copy prompt*, or cards go to AnkiMobile, a swipe to the right opens the full view, because those need a tap there.
+- **Edit** (in the list): tick marks you made by accident and discard them together. Discarded moments stay in *History* for a few days. A mark only this phone knows (the laptop was away) is gone right away.
+
 ## Furigana on the cards
 
 The front of a card shows the sentence without furigana, so the answer is not given away. **Tap a word to see its reading**, only that word; tap again to hide it. Words you do not know yet stay a puzzle, and you can reveal them one by one when you cannot place them. On the back, all readings are shown next to the translation and explanation.
