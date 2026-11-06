@@ -16,8 +16,10 @@ import { claudeAvailable } from './claude.ts';
 import { suwayomiInstalled } from './manga/suwayomi.ts';
 import { ocrAvailable } from './manga/prepare.ts';
 import { wordsReadByDay } from './text.ts';
-import { cardMade, wordState } from './knownWords.ts';
-import { aiExamples, aiLog, aiLogStats, createCard, recordPhoneAnswer, translateOnLaptop } from './cards.ts';
+import { cardMade, evidenceWords, wordState } from './knownWords.ts';
+import { getSkill, mergeIntoSkill } from './kanjiSkill.ts';
+import { evidenceOf } from '../../shared/kanjiSkill.ts';
+import { aiExamples, aiLog, aiLogStats, aiNote, cardsWaiting, createCard, recordPhoneAnswer, translateOnLaptop } from './cards.ts';
 import { cardsHere } from './anki.ts';
 import { kanjiInfo, KANJI_GZ } from './kanji.ts';
 import { DICT_GZ, dictMeta, dictState, ensureDictionary, lookupIndex } from './dict.ts';
@@ -92,6 +94,10 @@ export function apiRouter(): express.Router {
       });
     }),
   );
+  // The kanji collection (shared/kanjiSkill.ts): quiz progress kept here as a copy, and what the known words prove.
+  r.get('/kanji/skill', h(() => getSkill()));
+  r.put('/kanji/skill', h((req) => mergeIntoSkill(req.body)));
+  r.get('/kanji/evidence', h(() => evidenceOf(evidenceWords())));
   r.post(
     '/kanji',
     h((req) => kanjiInfo(String(req.body?.text ?? '').slice(0, 200))),
@@ -159,6 +165,8 @@ export function apiRouter(): express.Router {
         sessionMarks: store.listMoments((m) => m.sessionId !== undefined && m.sessionId === store.activeSession()?.id && m.status !== 'error').length,
         inboxCount: store.inboxMoments().length,
         player: playerConfigured(),
+        aiNote: aiNote(),
+        cardsWaiting: cardsWaiting() || undefined,
       };
     }),
   );

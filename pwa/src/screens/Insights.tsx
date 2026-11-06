@@ -195,6 +195,9 @@ function Overview({ a }: { a: Analytics }) {
       <button className="list-item action-row" style={{ marginBottom: 12 }} onClick={() => navigate('practice')}>
         Practice words and kanji from your marks
       </button>
+      <button className="list-item action-row" style={{ marginBottom: 12 }} onClick={() => navigate('kanji')}>
+        Kanji collection
+      </button>
       <section className="hero">
         <div className="eyebrow">Streak</div>
         <div className="hero-row">

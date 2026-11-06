@@ -5,13 +5,15 @@ const KEY = 'horu-reader';
 export type ReaderPrefs = {
   /** Tint speech bubbles by how many words in them are new to you */
   bubbleTint: boolean;
+  /** The screen at the end of a chapter (how much you understood); off: straight on to the next chapter */
+  chapterEnd: boolean;
 };
 
 export function readerPrefs(): ReaderPrefs {
   try {
-    return { bubbleTint: false, ...(JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<ReaderPrefs>) };
+    return { bubbleTint: false, chapterEnd: true, ...(JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<ReaderPrefs>) };
   } catch {
-    return { bubbleTint: false };
+    return { bubbleTint: false, chapterEnd: true };
   }
 }
 

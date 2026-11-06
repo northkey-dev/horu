@@ -231,7 +231,7 @@ async function entriesFor(forms: string[]): Promise<Map<string, CompactEntry[]>>
 const KANJI_KEY = '/dict/kanjidic.json';
 let kanjidic: Promise<Record<string, KanjiInfo>> | undefined;
 
-function loadKanjidic(): Promise<Record<string, KanjiInfo>> {
+export function loadKanjidic(): Promise<Record<string, KanjiInfo>> {
   kanjidic ??= (async () => {
     const cache = 'caches' in self ? await caches.open(DICT_CACHE) : undefined;
     const cached = await cache?.match(KANJI_KEY);

@@ -103,7 +103,15 @@ Phone and laptop sync whenever both are reachable; marks made on the phone alone
 
 **Practice** (button at the top of Insights → Overview) turns your own marks into drills, on the phone alone:
 - **Words:** the words with a kanji in your marked sentences that you do not know yet, most often seen first. Ten per round: look at the word and its sentence, tap *Show reading and meaning*, then *Again* (it comes back this round) or *Got it*. Three *Got it* over time lift a word to level 3 and take it off the list; *Known* stays your decision (word sheet, or a card).
-- **Kanji to learn first:** the kanji in your marks that no word you know contains, with meaning, readings and an example, the most frequent first.
+- **Kanji quiz:** a round is 8 kanji from your marks, or from the JLPT N5 or N4 list. For each kanji two questions with four choices: what it means, how it is read. Both right wins the round and gives the kanji its first stamp on the spot.
+- **Learn first:** the kanji in your marks that no word you know contains, with meaning, readings and an example, the most frequent first.
+
+**Kanji collection** (button in Insights → Overview, or from the quiz): all 2136 jouyou kanji as tiles, by school grade. A kanji only gets a stamp from proof, never from having been seen:
+- **Red stamp:** you won a quiz round with it, or you know at least one word with it (from Anki, jpdb, WaniKani, a word list, or set to *Known* by hand; a made card counts).
+- **Gold stamp:** you know three different words with it, or you won quiz rounds on three different days. A round raises the kanji one box at most once a day, and a lost round sets it back one box, so gold cannot be rushed.
+- **Outlined tile:** it appeared in something you marked or read, but has no stamp yet. Faint tile: not met yet.
+- The JLPT N5/N4 starter list (*Known words → JLPT baseline*) does **not** count here: it only assumes you know those words. Tap a tile for its meaning, reading and why it has its stamp.
+The quiz progress is kept on the phone and copied to the laptop (`data/kanji-skill.json`, part of the backup).
 
 ## The inbox
 
@@ -112,7 +120,7 @@ Every mark and mined line waits here. Each row shows the line, the word Horu sug
 - **List:** tap a row for the full view: choose the line, the word and the audio clip, then *Create card*.
 - **Swipe:** one moment at a time, with line and word already chosen. Swipe right for the card, left to discard. Tap a word to choose another one, *Open* for the full view. The view you used last stays. If your AI route is *Copy prompt*, or cards go to AnkiMobile, a swipe to the right opens the full view, because those need a tap there.
 - **Search:** with more than five rows, a box above the list finds a moment by any word of its lines, the card's word or where it is from (every word you type has to match). *History* has the same box.
-- **Edit** (in the list): tick marks you made by accident and discard them together. Discarded moments stay in *History* for a few days. A mark only this phone knows (the laptop was away) is gone right away.
+- **Edit** (in the list): tick marks and discard them together (for marks you made by accident), or press **Make cards** to create a card for each with the line and word Horu chose (the same as swiping right on each; moments that need a tap, such as a pasted AI answer, are left for you). Discarded moments stay in *History* for a few days. A mark only this phone knows (the laptop was away) is gone right away.
 
 ## Furigana on the cards
 
@@ -188,6 +196,7 @@ Good to know:
 - Pages are loaded in the background: the whole chapter starts loading when you open it, so turning pages does not wait. On a slow connection the old page stays until the next one is ready (a small spinner shows). **Save on phone** (below) removes the waiting completely.
 - *Before you read* (on the manga page) shows how much of the chapter you will probably understand and its key new words. It can be switched off in Settings.
 - **Tint bubbles by new words** (off by default, Settings → Manga reader): bubbles with words you do not know yet get a colour, the stronger the more new words. It helps you find the bubbles worth your time. Takes effect when you open a chapter.
+- **Chapter finished (読了):** turn past the last page and the chapter ends on one calm screen instead of jumping on: how much of its words you understood (known or ignored words, counted by occurrence), counting up; under it a line with that number for each chapter of this manga you finished, so you see it rise (*61% → 94% since you started this manga*); and, if you learned words while reading it, how many and where you started. It also says how many of the chapter's kanji you can read (they have a stamp). If you earned new stamps since the last chapter end (from the quiz or from words you learned in Anki), a button *See your N new stamps* presses them one by one into the collection, the gold ones last, and the count ticks up; no new stamps, no second screen. Otherwise two buttons: *Next chapter* and *Back to the chapters*. Nothing changes while you read. The numbers stay on the phone. Switch it off in Settings → Manga reader (*Screen at the end of a chapter*); the next chapter then opens straight away.
 - **Continue:** the Read page starts with a *Continue* button that opens the manga you read last, at the page where you stopped.
 - **Your place is remembered:** every chapter opens on the page you left it on, even if you closed the app in the middle, with or without the laptop (the phone keeps the place of your last 300 chapters). A chapter left on its last page counts as finished and starts again from page 1.
 
@@ -234,6 +243,7 @@ About saving on the phone:
 | Setting | Meaning |
 |---|---|
 | Tint speech bubbles by new words | Off by default. Colours bubbles by how many new words they hold (see Reading). |
+| Screen at the end of a chapter | On by default. The finished-chapter screen with your understanding and its growth (see Reading). Off: the next chapter opens straight away. |
 
 ### When something goes wrong
 
@@ -500,7 +510,7 @@ Every option in **Settings**, in the order of the screen. Settings that belong t
 | **Subtitles** | Jimaku API key | The laptop's key for Japanese subtitles (free, jimaku.cc → account). |
 | **Cards on the laptop** | Anki deck (Anime Mining) | The deck cards are added to. |
 | | New cards per day (10) | Applied once, when the deck is created. Change it later in Anki's deck options. |
-| | AI order | The AIs that write explanations and translations, in the order they are asked: *Claude Code* (`claude -p`, your subscription), *Gemini* (free key), *Anthropic* or *OpenAI* (your key), *Ollama* (a local model, free). The first one answers; when it is down, out of quota or has no key, the next one does. Move one up or down with the arrows (put the one whose answers you like best first), *Remove* it or *Add* another. Each has its own key, model and, for Ollama, address (default `http://127.0.0.1:11434`); keys stay on the laptop and are left out of the extra backup copy. |
+| | AI order | The AIs that write explanations and translations, in the order they are asked: *Claude Code* (`claude -p`, your subscription), *Gemini* (free key), *Anthropic* or *OpenAI* (your key), *Ollama* (a local model, free). The first one answers; when it is down, out of quota or has no key, the next one does, and the app says so for a while (*Claude did not answer, so Gemini is writing…*). If none answers, a card is not lost: it waits in the inbox as "creating", Horu asks again every 5 minutes and makes the card as soon as one does (you can discard it meanwhile). Move one up or down with the arrows (put the one whose answers you like best first), *Remove* it or *Add* another. Each has its own key, model and, for Ollama, address (default `http://127.0.0.1:11434`); keys stay on the laptop and are left out of the extra backup copy. |
 | | About you (for the AI) | Level and goals, so explanations fit. Phones use it too unless they set their own. |
 | | AI answers are kept | Every explanation and translation the laptop's AI writes is saved in `data/ai-log.jsonl` (one line each: the text that went in, the answer, which AI). Asking for the same card text or line again is answered from there at once, without the AI. Another AI, model or *About you* text asks again. Under a translation, **Good** / **Poor** rate it and **Ask again** gets a new one from the AI. Answers from a key on the phone are added too once the laptop is reachable. Below the AI order, Settings counts the answers and offers **Download as training examples** (all, or only those marked good) as a `.jsonl` file of chats, ready to teach a small local model; answers marked poor are never in it. The file is part of the daily backup. |
 | | Screenshot on anime cards (off) | Off: anime cards only get sentence and audio. Manga cards always get their panel. |

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
-import { api, imageUrl } from '../lib/api.ts';
+import { api, imageUrl, laptopMakesCards, laptopUp } from '../lib/api.ts';
 import { flash, navigate, useMedia, usePoll } from '../lib/hooks.ts';
-import { defaultLine, haveCards, planFor, planKey } from '../lib/inbox.ts';
+import { defaultLine, haveCards, planFor, planKey, requestFor, sendCard } from '../lib/inbox.ts';
 import { inboxView, setInboxView } from '../lib/phone.ts';
 import { InboxStack } from './InboxStack.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { Nav } from '../components/Nav.tsx';
 import type { Moment } from '../../../shared/types.ts';
+import { aiRoute, cardRoute } from '../lib/cards.ts';
 import { SearchBox } from '../components/SearchBox.tsx';
 import { matchesQuery } from '../../../shared/search.ts';
 
@@ -83,6 +84,30 @@ export function Inbox() {
     setPicked(next);
   }
 
+  /** A card for each ticked moment, with the line and word Horu chose (the swipe view does the same one by one). */
+  async function makeCards() {
+    const route = cardRoute(laptopUp() && laptopMakesCards());
+    const ai = aiRoute(route);
+    if (ai === 'copy' || route === 'ankimobile') return flash('This card route needs a tap for each card: open them one by one.');
+    setBusy(true);
+    let made = 0;
+    let looks = 0;
+    for (const m of chosen.filter((m) => m.status === 'ready')) {
+      try {
+        const plan = await planFor(m);
+        if (!plan?.target) throw new Error('no word chosen');
+        await sendCard(m, requestFor(m, plan, plan.target), plan.target.form, route, ai);
+        made++;
+      } catch {
+        looks++;
+      }
+    }
+    flash(`${made} card${made === 1 ? '' : 's'} on the way${looks ? ` · ${looks} need a look` : ''}`);
+    edit(false);
+    setBusy(false);
+    refresh();
+  }
+
   async function discard() {
     setBusy(true);
     let done = 0;
@@ -145,6 +170,9 @@ export function Inbox() {
             <div className="action-bar">
               <button disabled={busy} onClick={() => setPicked(new Set(chosen.length === all.length ? [] : all.map((m) => m.id)))}>
                 {chosen.length === all.length ? 'Select none' : 'Select all'}
+              </button>
+              <button className="primary" disabled={busy || !chosen.length} onClick={() => void makeCards()}>
+                {chosen.length ? `Make ${chosen.length} card${chosen.length === 1 ? '' : 's'}` : 'Make cards'}
               </button>
               <button className="danger" disabled={busy || !chosen.length} onClick={() => void discard()}>
                 {chosen.length ? `Discard ${chosen.length}` : 'Discard'}

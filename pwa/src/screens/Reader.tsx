@@ -9,6 +9,9 @@ import { statusOf } from '../lib/words.ts';
 import { bubbleEdits, readerPrefs, saveBubbleEdit } from '../lib/readerPrefs.ts';
 import { Icon } from '../components/Icon.tsx';
 import { TextSheet } from '../components/TextSheet.tsx';
+import { ChapterDone } from '../components/ChapterDone.tsx';
+import { recordScore, resultSince, snapshotOf, type Result, type Snapshot } from '../lib/chapterScore.ts';
+import { chapterStamps } from '../lib/kanjiSkill.ts';
 
 // Full-screen manga reader. Japanese order: tap the LEFT side (or swipe right)
 // for the next page. Tap a speech bubble to read it with the dictionary or translate it whole. Pinch or
@@ -88,6 +91,9 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
   const [block, setBlock] = useState<number>();
   const [toast, setToast] = useState<string>();
   const [rect, setRect] = useState<Rect>();
+  // The end-of-chapter screen, and what the chapter's words looked like when it was opened (to see what you learned)
+  const [done, setDone] = useState<Result & { history: number[] } & Partial<Awaited<ReturnType<typeof chapterStamps>>>>();
+  const opened = useRef<{ key: string; snapshot: Promise<Snapshot> }>(undefined);
   const [ready, setReady] = useState<{ key: string; order: number }[]>([]);
   const stage = useRef<HTMLDivElement>(null);
   // The page on screen. It follows `page` only once the new one is decoded; until then the old one stays.
@@ -120,9 +126,13 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
     setError(undefined);
     setBlock(undefined);
     setFrame(undefined);
+    setDone(undefined);
     loadChapter(chapterKey).then(
       (d) => {
         setData(d);
+        const snapshot = snapshotOf(d, chapterKey, bubbleEdits());
+        snapshot.catch(() => undefined);
+        opened.current = { key: chapterKey, snapshot };
         // Where this chapter was left: the page remembered on this phone, else the laptop's note. A chapter left on
         // its last page was finished, and starts over.
         const lib = mangaApi.cachedLibrary().find((m) => m.key === d.mangaKey);
@@ -267,13 +277,28 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
     };
   }, [nearEnd, nextKey]);
 
+  /** Past the last page: the chapter is done. Shows how much of it you understood; without that, on to the next. */
+  async function finishChapter() {
+    if (!data) return;
+    try {
+      if (!readerPrefs().chapterEnd) throw new Error('switched off');
+      const start = opened.current?.key === chapterKey ? await opened.current.snapshot : await snapshotOf(data, chapterKey, bubbleEdits());
+      if (!start.words.length) throw new Error('no words');
+      const result = await resultSince(start);
+      const kanji = await chapterStamps(start.words).catch(() => undefined);
+      setDone({ ...result, history: recordScore(data.mangaKey, data.order, result.pct).map((c) => c.pct), ...kanji });
+    } catch {
+      if (neighbours.next) navigate(`manga/read/${neighbours.next.key}`);
+      else setChrome(true);
+    }
+  }
+
   const go = (delta: number) => {
     if (!data) return;
     setBlock(undefined);
     const target = page + delta;
     if (target >= data.pages.length) {
-      if (neighbours.next) navigate(`manga/read/${neighbours.next.key}`);
-      else setChrome(true);
+      void finishChapter();
       return;
     }
     if (target < 0) {
@@ -587,6 +612,21 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
           onMine={(hint) => void mine(hint)}
           onReframe={() => setFrame(current.blocks[block].box)}
           onClose={() => setBlock(undefined)}
+        />
+      )}
+
+      {done && data && (
+        <ChapterDone
+          title={data.mangaTitle}
+          chapter={data.name}
+          pct={done.pct}
+          history={done.history}
+          readable={done.readable}
+          stamps={done.stamps ?? []}
+          collection={done.collection}
+          hasNext={!!neighbours.next}
+          onNext={() => neighbours.next && navigate(`manga/read/${neighbours.next.key}`)}
+          onBack={() => navigate(`manga/m/${data.mangaKey}`)}
         />
       )}
 

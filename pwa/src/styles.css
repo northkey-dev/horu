@@ -724,3 +724,55 @@ select option, select optgroup { background-color: var(--bg); color: var(--ink);
 button.ghost.on { color: var(--accent); font-weight: 600; }
 
 .search-box { width: 100%; box-sizing: border-box; margin: 4px 0 12px; }
+
+/* ==================================================================== chapter finished */
+.chapter-done { position: absolute; inset: 0; z-index: 5; background: #151311; color: #eee7da; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 28px calc(env(safe-area-inset-bottom) + 28px); text-align: center; animation: cd-in 420ms ease-out both; }
+.cd-seal { font: 600 22px/1 var(--font-jp); background: var(--accent); color: var(--on-accent); padding: 9px 12px; border-radius: 6px; transform: rotate(-3deg); margin-bottom: 18px; }
+.cd-title { max-width: 100%; color: #a39a8b; font-size: 15px; }
+.cd-number { font: 600 96px/1 var(--serif); letter-spacing: -0.02em; margin: 26px 0 4px; }
+.cd-number span { font-size: 40px; margin-left: 2px; color: #a39a8b; }
+.cd-label { color: #a39a8b; font-size: 15px; }
+.cd-curve { width: min(280px, 80%); height: auto; margin: 30px 0 6px; overflow: visible; }
+.cd-curve path { fill: none; stroke: #a39a8b; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 400; stroke-dashoffset: 400; animation: cd-draw 1100ms 250ms ease-out forwards; }
+.cd-curve circle { fill: var(--accent); opacity: 0; animation: cd-fade 300ms 1250ms ease-out forwards; }
+.cd-curve .halo { opacity: 0; animation: cd-halo 300ms 1250ms ease-out forwards; }
+.cd-caption { color: #a39a8b; font-size: 14px; margin-top: 8px; max-width: 300px; }
+.cd-actions { display: flex; flex-direction: column; gap: 8px; width: min(320px, 100%); margin-top: 38px; }
+.cd-actions .ghost { color: #a39a8b; }
+@keyframes cd-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cd-draw { to { stroke-dashoffset: 0; } }
+@keyframes cd-fade { to { opacity: 1; } }
+@keyframes cd-halo { to { opacity: 0.22; } }
+@media (prefers-reduced-motion: reduce) {
+  .chapter-done, .cd-curve path, .cd-curve circle, .cd-curve .halo { animation: none; stroke-dashoffset: 0; opacity: 1; }
+  .cd-curve .halo { opacity: 0.22; }
+}
+
+/* ==================================================================== kanji stamps and quiz */
+.stamp { --size: 64px; display: inline-flex; align-items: center; justify-content: center; width: var(--size); height: var(--size); border: 3px solid var(--accent); border-radius: 8px; color: var(--accent); background: transparent; transform: rotate(-4deg); animation: stamp-in 480ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both; box-shadow: inset 0 0 0 1.5px var(--accent); }
+.stamp .jp { font: 600 calc(var(--size) * 0.56)/1 var(--font-jp); }
+.stamp.l2 { border-color: #c9a227; color: #a9830f; box-shadow: inset 0 0 0 1.5px #c9a227, 0 0 18px rgba(201, 162, 39, 0.45); }
+.stamp.still { animation: none; }
+@keyframes stamp-in { 0% { transform: scale(2.4) rotate(-16deg); opacity: 0; } 55% { transform: scale(0.92) rotate(-4deg); opacity: 1; } 100% { transform: scale(1) rotate(-4deg); opacity: 1; } }
+.stamp-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 10px 0; }
+.quiz-done { text-align: center; }
+.quiz { margin-top: 20px; text-align: center; position: relative; }
+.quiz-kanji { font-size: 110px; line-height: 1.25; margin: 6px 0 18px; }
+.quiz-options { display: grid; gap: 8px; }
+.quiz-option { min-height: 52px; font-size: 17px; border: var(--hair) solid var(--line-strong); border-radius: 10px; padding: 10px 14px; background: transparent; color: var(--ink); text-align: center; }
+.quiz-option.right { border-color: #4f9d69; background: rgba(79, 157, 105, 0.16); }
+.quiz-option.wrong { border-color: var(--accent); background: var(--accent-tint); }
+.quiz-option.dim { opacity: 0.4; }
+.quiz-press { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.45); z-index: 20; pointer-events: none; }
+.kanji-total { font-size: 17px; margin-top: 4px; }
+.kanji-total .serif { font-size: 40px; }
+.kgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 4px; margin-bottom: 18px; }
+.kcell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 20px; padding: 0; min-height: 0; border-radius: 5px; border: 1px solid transparent; background: transparent; color: var(--text-2); opacity: 0.28; }
+.kcell.seen { opacity: 0.75; border-color: var(--line-strong); }
+.kcell.l1 { opacity: 1; color: var(--accent); border-color: var(--accent); background: var(--accent-tint); font-weight: 600; }
+.kcell.l2 { opacity: 1; color: #a9830f; border-color: #c9a227; background: rgba(201, 162, 39, 0.16); font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .stamp { animation: none; } }
+
+.cd-stamps { margin-top: 26px; max-width: 340px; }
+.cd-count { font-size: 48px; margin: 30px 0 0; }
+.cd-count span { font-size: 22px; }

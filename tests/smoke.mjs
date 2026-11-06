@@ -322,6 +322,22 @@ try {
     assert.ok(json.some((c) => c.name === 'Disk space' && c.state !== 'bad'));
   });
 
+  await check('kanji collection: progress is kept merged, evidence excludes the JLPT starter list', async () => {
+    assert.deepEqual((await call('GET', '/api/kanji/skill')).json, {});
+    await call('PUT', '/api/kanji/skill', { 日: { box: 1, at: '2026-11-05', right: 1, wrong: 0 }, 'x': { box: 9 }, 本: { box: 99, at: 'nonsense', right: -4, wrong: 'a' } });
+    const { json: a } = await call('GET', '/api/kanji/skill');
+    assert.equal(a['日'].box, 1);
+    assert.equal(a['x'], undefined, 'only single kanji get in');
+    assert.deepEqual(a['本'], { box: 9, at: '', right: 0, wrong: 0 }, 'numbers are bounded, a bad day is dropped');
+    await call('PUT', '/api/kanji/skill', { 日: { box: 2, at: '2026-11-06', right: 2, wrong: 0 } });
+    assert.equal((await call('GET', '/api/kanji/skill')).json['日'].box, 2, 'a later round replaces an earlier one');
+    await call('PUT', '/api/kanji/skill', { 日: { box: 0, at: '2026-11-01', right: 0, wrong: 0 } });
+    assert.equal((await call('GET', '/api/kanji/skill')).json['日'].box, 2, 'an older copy does not overwrite');
+    const { status, json } = await call('GET', '/api/kanji/evidence');
+    assert.equal(status, 200);
+    assert.ok(json && typeof json === 'object');
+  });
+
   await check('share: Japanese sentences of a shared text reach the inbox', async () => {
     const before = (await call('GET', '/api/inbox')).json.length;
     const res = await fetch(base + '/api/text/share', { method: 'POST', headers: { 'Content-Type': 'text/plain; charset=utf-8' }, body: '今日は雨だ。でも行く！\nEnglish only' });

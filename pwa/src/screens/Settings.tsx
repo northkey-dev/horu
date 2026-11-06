@@ -507,6 +507,13 @@ function ReaderSettings() {
             <span className="hint">Bubbles with words you do not know yet get a colour: the more new words, the stronger. Off by default. Takes effect when you open a chapter.</span>
           </span>
         </label>
+        <label className="toggle">
+          <input type="checkbox" checked={prefs.chapterEnd} onChange={(e) => setReaderPrefs({ chapterEnd: e.target.checked })} />
+          <span className="grow">
+            Screen at the end of a chapter
+            <span className="hint">How much of the chapter you understood, and how that grew over this manga. Off: the next chapter opens straight away.</span>
+          </span>
+        </label>
       </div>
     </>
   );

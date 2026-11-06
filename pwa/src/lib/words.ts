@@ -87,6 +87,17 @@ export async function knownCheck(words: string[]): Promise<Record<string, boolea
   return Object.fromEntries(words.map((w) => [w, set.has(w)]));
 }
 
+/** Words this phone alone knows for real: imports other than the JLPT starter list, and words set to Known. */
+export async function ownKnownWords(): Promise<string[]> {
+  const l = await localState();
+  const set = new Set(Object.entries(l.imported).filter(([source]) => source !== 'jlpt').flatMap(([, words]) => words));
+  for (const [w, s] of Object.entries(l.status)) {
+    if (isUnderstood(s)) set.add(w);
+    else set.delete(w);
+  }
+  return [...set];
+}
+
 export async function setWordStatus(word: string, status: WordStatus): Promise<void> {
   const l = await localState();
   l.status[word] = status;

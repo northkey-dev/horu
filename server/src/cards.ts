@@ -2,7 +2,7 @@ import { speak, ttsOn } from './tts.ts';
 import fs from 'node:fs';
 import { cutClip } from './audio.ts';
 import { ClaudeError, explain, translate } from './claude.ts';
-import { AI_LABELS, DEFAULT_MODELS, aiChain, buildPrompt, explainWith, translatePrompt, translateWith, type AiEngine, type ExplainInput, type Explanation, type TranslateInput, type Translation } from '../../shared/ai.ts';
+import { AI_LABELS, DEFAULT_MODELS, ENGINE_LABELS, aiChain, buildPrompt, explainWith, translatePrompt, translateWith, type AiEngine, type ExplainInput, type Explanation, type TranslateInput, type Translation } from '../../shared/ai.ts';
 import { aiKey, createAiLog, trainingLines } from './aiLog.ts';
 import { ChainError, runChain } from './aiChain.ts';
 import path from 'node:path';
@@ -14,7 +14,8 @@ import { addNote } from './anki.ts';
 import { furiganaHtml, readingOf } from './japanese.ts';
 import { addKanjiCards } from './kanji.ts';
 import { log } from './log.ts';
-import { DATA_DIR, getSettings } from './config.ts';
+import { DATA_DIR, getSettings, writeJsonAtomic } from './config.ts';
+import { readJsonKeepingDamaged } from './jsonFile.ts';
 import * as store from './store.ts';
 import type { CardRequest } from '../../shared/types.ts';
 
@@ -29,12 +30,54 @@ export function createCard(id: string, req: CardRequest, opts: { skipAi?: boolea
   if (!(req.targetEnd > req.targetStart)) throw new Error('Pick a target word first');
   store.updateMoment(id, { status: 'creating', error: undefined });
   chain = chain.then(() =>
-    build(id, req, opts).catch((err: Error) => {
-      log.error('Card creation failed', err);
-      store.updateMoment(id, { status: 'error', error: err.message });
-    }),
+    build(id, req, opts).then(
+      () => forget(id),
+      (err: Error) => {
+        // No AI answered (limit reached, offline, down): the card is not lost, it waits and is made when one does.
+        if (isOutage(err) && !opts.skipAi) return wait(id, req, opts);
+        forget(id);
+        log.error('Card creation failed', err);
+        store.updateMoment(id, { status: 'error', error: err.message });
+      },
+    ),
   );
 }
+
+type Waiting = { req: CardRequest; opts: { skipAi?: boolean }; since: number };
+const WAITING_FILE = path.join(DATA_DIR, 'card-queue.json');
+const waiting = new Map<string, Waiting>(Object.entries(readJsonKeepingDamaged<Record<string, Waiting>>(WAITING_FILE, () => ({}))));
+const saveWaiting = () => writeJsonAtomic(WAITING_FILE, Object.fromEntries(waiting));
+const isOutage = (err: Error) => err instanceof ChainError || (err instanceof ClaudeError && err.timedOut) || /did not answer|no API key|not reachable|limit/i.test(err.message);
+/** Number of cards waiting for an AI. */
+export const cardsWaiting = (): number => waiting.size;
+
+function forget(id: string): void {
+  if (waiting.delete(id)) saveWaiting();
+}
+
+function wait(id: string, req: CardRequest, opts: { skipAi?: boolean }): void {
+  waiting.set(id, { req, opts, since: waiting.get(id)?.since ?? Date.now() });
+  saveWaiting();
+  log.warn(`Card ${id} waits for an AI`);
+  store.updateMoment(id, { status: 'creating', error: 'No AI answered. Horu asks again every 5 minutes and makes the card as soon as one does. Discard it here if you do not want it.' });
+}
+
+function retryWaiting(): void {
+  for (const [id, w] of [...waiting]) {
+    const moment = store.getMoment(id);
+    if (!moment || moment.status !== 'creating' || Date.now() - w.since > 3 * 86_400_000) {
+      forget(id);
+      continue;
+    }
+    try {
+      createCard(id, w.req, w.opts);
+    } catch (err) {
+      log.warn('Waiting card could not start again:', (err as Error).message);
+    }
+  }
+}
+setInterval(retryWaiting, 5 * 60_000).unref();
+setTimeout(retryWaiting, 90_000).unref();
 
 async function build(id: string, req: CardRequest, opts: { skipAi?: boolean }): Promise<void> {
   const moment = store.getMoment(id)!;
@@ -113,6 +156,13 @@ async function build(id: string, req: CardRequest, opts: { skipAi?: boolean }): 
 // file is the training set for a small local model later. Settings → AI sets which AIs are asked, in which order.
 export const aiLog = createAiLog(path.join(DATA_DIR, 'ai-log.jsonl'));
 
+// When another AI had to answer for the first one, the app says so for a while (and stops saying it as soon as the
+// first one answers again).
+let fallbackNote: { at: number; text: string } | undefined;
+const NOTE_MS = 20 * 60_000;
+const nameOf = (e: string) => ENGINE_LABELS[e as AiEngine].replace(/ \(.*\)$/, '');
+export const aiNote = (): string | undefined => (fallbackNote && Date.now() - fallbackNote.at < NOTE_MS ? fallbackNote.text : undefined);
+
 type KeyEngine = 'gemini' | 'anthropic' | 'openai';
 const KEY_OF = { gemini: 'aiKeyGemini', anthropic: 'aiKeyAnthropic', openai: 'aiKeyOpenai' } as const;
 const MODEL_OF = { gemini: 'aiModelGemini', anthropic: 'aiModelAnthropic', openai: 'aiModelOpenai', ollama: 'aiModelOllama' } as const;
@@ -145,6 +195,7 @@ async function ask<I, O>(kind: 'explain' | 'translate', input: I, parts: unknown
     notSetUp,
     (e, message) => log.warn(`${e} did not answer, trying the next AI:`, message),
   );
+  fallbackNote = engine === engines[0] ? undefined : { at: Date.now(), text: `${nameOf(engines[0])} did not answer, so ${nameOf(engine)} is writing the explanations and translations.` };
   const key = keyFor(kind, engine as AiEngine, parts);
   aiLog.add(key, { t: new Date().toISOString(), kind, engine, model: modelOf(engine as AiEngine), profile: getSettings().learnerProfile, input, output: result });
   return { output: result, ref: key };

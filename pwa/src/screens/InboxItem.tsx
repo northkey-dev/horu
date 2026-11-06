@@ -363,7 +363,7 @@ function Editor({ moment, refresh }: { moment: Moment; refresh: () => void }) {
 
       {!finished && !ankiLink && (
         <div className="action-bar">
-          <button className="danger icon-only" disabled={busy || moment.status === 'creating'} onClick={discard} aria-label="Discard">
+          <button className="danger icon-only" disabled={busy || (moment.status === 'creating' && !moment.error)} onClick={discard} aria-label="Discard">
             <Icon name="trash" size={21} />
           </button>
           <button disabled={busy || busyStatus || !sentence} onClick={() => create(true)}>

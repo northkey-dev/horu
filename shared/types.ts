@@ -110,6 +110,10 @@ export type Status = {
   inboxCount: number;
   /** Media player or server the laptop can ask for the playback position (Settings → Media player) */
   player?: string;
+  /** Set for a while after the first AI of the order did not answer and another one did */
+  aiNote?: string;
+  /** Cards waiting for an AI to answer again */
+  cardsWaiting?: number;
 };
 
 export type Settings = {

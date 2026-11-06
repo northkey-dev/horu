@@ -3,6 +3,8 @@ import { api } from '../lib/api.ts';
 import { kanjiInfo, lookupForm, tokenize, type DictEntry } from '../lib/japanese.ts';
 import { setWordStatus, statusOf } from '../lib/words.ts';
 import { Nav } from '../components/Nav.tsx';
+import { KanjiQuiz } from '../components/KanjiQuiz.tsx';
+import { navigate } from '../lib/hooks.ts';
 import { kanjiFocus, wordsToPractice, type KanjiRow, type PracticeSentence, type WordCard } from '../../../shared/practice.ts';
 import { isUnderstood, type WordStatus } from '../../../shared/words.ts';
 import type { KanjiInfo } from '../../../shared/kanji.ts';
@@ -42,8 +44,8 @@ async function load(): Promise<Loaded> {
   };
 }
 
-export function Practice() {
-  const [tab, setTab] = useState<'words' | 'kanji'>('words');
+export function Practice({ startOn }: { startOn?: 'quiz' }) {
+  const [tab, setTab] = useState<'words' | 'quiz' | 'kanji'>(startOn ?? 'words');
   const [data, setData] = useState<Loaded>();
   const [error, setError] = useState<string>();
 
@@ -59,12 +61,16 @@ export function Practice() {
         <button role="tab" aria-selected={tab === 'words'} className={tab === 'words' ? 'on' : ''} onClick={() => setTab('words')}>
           Words
         </button>
+        <button role="tab" aria-selected={tab === 'quiz'} className={tab === 'quiz' ? 'on' : ''} onClick={() => setTab('quiz')}>
+          Kanji quiz
+        </button>
         <button role="tab" aria-selected={tab === 'kanji'} className={tab === 'kanji' ? 'on' : ''} onClick={() => setTab('kanji')}>
-          Kanji to learn first
+          Learn first
         </button>
       </div>
+      {tab === 'quiz' && <KanjiQuiz />}
       {error && <div className="banner error" style={{ marginTop: 16 }}>{error}</div>}
-      {!data && !error && (
+      {!data && !error && tab !== 'quiz' && (
         <p className="muted row small" style={{ marginTop: 24 }}>
           <span className="spinner" /> Reading your marks…
         </p>

@@ -16,6 +16,7 @@ import { Insights } from './screens/Insights.tsx';
 import { Texts } from './screens/Texts.tsx';
 import { Camera } from './screens/Camera.tsx';
 import { Practice } from './screens/Practice.tsx';
+import { Kanji } from './screens/Kanji.tsx';
 
 // Once per start: the laptop's Anki note type, deck and learner profile, for cards the phone builds itself.
 let learned = false;
@@ -112,6 +113,7 @@ export function App() {
             <button onClick={() => refresh()}>Check again</button>
           </div>
         )}
+        {status?.aiNote && page !== 'manga' && page !== 'texts' && page !== 'camera' && <div className="banner info">{status.aiNote}</div>}
         {page === 'watch' && <Watch status={status} refreshStatus={refresh} />}
         {page === 'inbox' && !arg && <Inbox />}
         {page === 'history' && <History />}
@@ -120,14 +122,15 @@ export function App() {
         {page === 'texts' && <Texts id={arg} />}
         {page === 'camera' && <Camera />}
         {page === 'insights' && <Insights />}
-        {page === 'practice' && <Practice />}
+        {page === 'practice' && <Practice startOn={arg === 'quiz' ? 'quiz' : undefined} />}
+        {page === 'kanji' && <Kanji />}
         {page === 'settings' && <Settings status={status} />}
       </main>
       {toast && <div className="toast top">{toast}</div>}
       <nav className="tabbar">
         <div className="tabbar-inner">
           {TABS.map((t) => {
-            const active = page === t.path || (t.path === 'inbox' && page === 'history') || (t.path === 'manga' && (page === 'texts' || page === 'camera')) || (t.path === 'insights' && page === 'practice');
+            const active = page === t.path || (t.path === 'inbox' && page === 'history') || (t.path === 'manga' && (page === 'texts' || page === 'camera')) || (t.path === 'insights' && (page === 'practice' || page === 'kanji'));
             return (
               <a key={t.path} href={`#/${t.path}`} className={active ? 'active' : ''} aria-current={active ? 'page' : undefined}>
                 <Icon name={t.icon} size={25} weight={1.5} />

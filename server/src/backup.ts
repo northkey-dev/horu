@@ -11,7 +11,7 @@ import { flush } from './store.ts';
 // Daily copy of everything Horu cannot rebuild: moments and sessions, settings, known words, vocabulary and
 // Anki history, push keys. Media, dictionaries and manga are large and can be fetched again, so they stay out.
 
-const FILES = ['db.json', 'settings.json', 'known.json', 'vocab-history.json', 'analytics-anki.json', 'manga.json', 'push.json', 'token.txt', 'reading.json', 'prepared.json', 'kanji-cards.json'];
+const FILES = ['db.json', 'settings.json', 'known.json', 'vocab-history.json', 'analytics-anki.json', 'manga.json', 'push.json', 'token.txt', 'reading.json', 'prepared.json', 'kanji-cards.json', 'kanji-skill.json'];
 // Grows with every answer of the AI and is only text: stored packed (about a tenth of the size).
 const PACKED = ['ai-log.jsonl'];
 const SUBFOLDERS = ['subs'];
