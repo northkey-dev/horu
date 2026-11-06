@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { api } from '../lib/api.ts';
-import { navigate, usePoll } from '../lib/hooks.ts';
+import { usePoll } from '../lib/hooks.ts';
 import { Nav } from '../components/Nav.tsx';
 import { Icon } from '../components/Icon.tsx';
 import { Bars, Heatmap, HourBars, Line, Range, Ring, Stack, WeekdayBars, fmtDay, fmtMinutes, fmtShort, type BarDatum } from '../components/charts.tsx';
@@ -29,7 +29,7 @@ function readTab(): Tab {
 const pct = (x: number) => `${Math.round(100 * x)}%`;
 const isActive = (d?: DayStat) => !!d && d.reviews + d.marked + d.cards + d.watchBlocks + d.chapters + (d.readBlocks ?? 0) > 0;
 
-export function Insights() {
+export function Insights({ embedded = false }: { embedded?: boolean }) {
   const { data, error, refresh } = usePoll(() => api.analytics(), 30_000);
   const [tab, setTab] = useState<Tab>(readTab);
   const [updating, setUpdating] = useState(false);
@@ -59,9 +59,9 @@ export function Insights() {
 
   return (
     <div>
-      <Nav />
-      <h1>Insights</h1>
-      <div className="segmented tabs" role="tablist" aria-label="Insights">
+      {!embedded && <Nav />}
+      {!embedded && <h1>Insights</h1>}
+      <div className="segmented tabs" role="tablist" aria-label="Insights" style={embedded ? { marginTop: 14 } : undefined}>
         {TABS.map((t) => (
           <button key={t.id} role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'on' : ''} onClick={() => choose(t.id)}>
             {t.label}
@@ -192,12 +192,6 @@ function Overview({ a }: { a: Analytics }) {
 
   return (
     <>
-      <button className="list-item action-row" style={{ marginBottom: 12 }} onClick={() => navigate('practice')}>
-        Practice words and kanji from your marks
-      </button>
-      <button className="list-item action-row" style={{ marginBottom: 12 }} onClick={() => navigate('kanji')}>
-        Kanji collection
-      </button>
       <section className="hero">
         <div className="eyebrow">Streak</div>
         <div className="hero-row">

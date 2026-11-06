@@ -22,7 +22,7 @@ async function load(): Promise<Loaded> {
   return { dic, collection, seen };
 }
 
-export function Kanji() {
+export function Kanji({ embedded = false }: { embedded?: boolean }) {
   const [data, setData] = useState<Loaded>();
   const [error, setError] = useState<string>();
   const [open, setOpen] = useState<string>();
@@ -35,7 +35,7 @@ export function Kanji() {
   if (!data)
     return (
       <div>
-        <Nav back="Practice" to="practice" />
+        {!embedded && <Nav back="Study" to="study" />}
         <p className="muted row small" style={{ marginTop: 24 }}>
           <span className="spinner" /> Loading the collection…
         </p>
@@ -51,14 +51,14 @@ export function Kanji() {
 
   return (
     <div>
-      <Nav back="Practice" to="practice" />
-      <h1>Kanji</h1>
-      <div className="kanji-total">
+      {!embedded && <Nav back="Study" to="study" />}
+      {!embedded && <h1>Kanji</h1>}
+      <div className="kanji-total" style={embedded ? { marginTop: 18 } : undefined}>
         <span className="serif num">{red + gold}</span>
         <span className="muted"> / {all.length} stamped</span>
         {gold > 0 && <span className="muted small"> · {gold} gold</span>}
       </div>
-      <button className="list-item action-row" style={{ margin: '12px 0 4px' }} onClick={() => navigate('practice/quiz')}>
+      <button className="list-item action-row" style={{ margin: '12px 0 4px' }} onClick={() => navigate('study/quiz')}>
         Quiz me
       </button>
       {groups.map((g) => {

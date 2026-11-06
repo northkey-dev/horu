@@ -234,7 +234,7 @@ export function Settings({ status }: { status?: Status }) {
       {s && (
         <>
           <h2>Progress</h2>
-          <div className="group">{field('dailyGoalXp', 'Daily goal (XP)', 'number', 'Fills the ring on Insights. About 40 XP is 20 reviews and a few marks; a card is worth 10.')}</div>
+          <div className="group">{field('dailyGoalXp', 'Daily goal (XP)', 'number', 'Fills the ring on Study → Progress. About 40 XP is 20 reviews and a few marks; a card is worth 10.')}</div>
 
           <h2>Reminder</h2>
           <div className="group">

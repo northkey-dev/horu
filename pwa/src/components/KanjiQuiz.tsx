@@ -157,7 +157,7 @@ export function KanjiQuiz() {
           <button className="grow" onClick={() => setItems(undefined)}>
             Another round
           </button>
-          <button className="primary grow" onClick={() => navigate('kanji')}>
+          <button className="primary grow" onClick={() => navigate('study/kanji')}>
             Open the collection
           </button>
         </div>

@@ -44,7 +44,7 @@ async function load(): Promise<Loaded> {
   };
 }
 
-export function Practice({ startOn }: { startOn?: 'quiz' }) {
+export function Practice({ startOn, embedded = false }: { startOn?: 'quiz'; embedded?: boolean }) {
   const [tab, setTab] = useState<'words' | 'quiz' | 'kanji'>(startOn ?? 'words');
   const [data, setData] = useState<Loaded>();
   const [error, setError] = useState<string>();
@@ -55,9 +55,9 @@ export function Practice({ startOn }: { startOn?: 'quiz' }) {
 
   return (
     <div>
-      <Nav back="Insights" to="insights" />
-      <h1>Practice</h1>
-      <div className="segmented tabs" role="tablist" aria-label="Practice">
+      {!embedded && <Nav back="Study" to="study" />}
+      {!embedded && <h1>Practice</h1>}
+      <div className="segmented tabs" role="tablist" aria-label="Practice" style={embedded ? { marginTop: 14 } : undefined}>
         <button role="tab" aria-selected={tab === 'words'} className={tab === 'words' ? 'on' : ''} onClick={() => setTab('words')}>
           Words
         </button>

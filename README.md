@@ -97,16 +97,18 @@ Phone and laptop sync whenever both are reachable; marks made on the phone alone
 
 **Laptop switched off?** The app on your home screen keeps working from what the phone stored and shows *Laptop not reachable* with the likely reason (no internet, no answer, or Tailscale not connected), which app version the saved copy is, and a **Check again** button. It starts after about 3 seconds. You can still mark moments, read texts and saved manga chapters, look up words and make `.apkg` cards. Screenshots and audio from the laptop, Whisper, manga sources, text recognition and reminders wait until it is back. Only two things need the laptop on: adding the app to the home screen and opening it once or twice afterwards, so it can store everything (about 40 MB), and getting a new version.
 
-## Insights and practice
+## The Study tab
 
-**Insights** shows your streak, daily goal, level, a calendar, last week next to the week before (XP, days studied, new words, reviews and cards), the Anki history and what you mined.
+The fourth tab, **Study**, has three parts at the top: **Practice** (what you do), **Kanji** (what you collect) and **Progress** (how you are doing).
 
-**Practice** (button at the top of Insights → Overview) turns your own marks into drills, on the phone alone:
+**Progress** (the former Insights) shows your streak, daily goal, level, a calendar, last week next to the week before (XP, days studied, new words, reviews and cards), the Anki history and what you mined.
+
+**Practice** turns your own marks into drills, on the phone alone:
 - **Words:** the words with a kanji in your marked sentences that you do not know yet, most often seen first. Ten per round: look at the word and its sentence, tap *Show reading and meaning*, then *Again* (it comes back this round) or *Got it*. Three *Got it* over time lift a word to level 3 and take it off the list; *Known* stays your decision (word sheet, or a card).
 - **Kanji quiz:** a round is 8 kanji from your marks, or from the JLPT N5 or N4 list. For each kanji two questions with four choices: what it means, how it is read. Both right wins the round and gives the kanji its first stamp on the spot.
 - **Learn first:** the kanji in your marks that no word you know contains, with meaning, readings and an example, the most frequent first.
 
-**Kanji collection** (button in Insights → Overview, or from the quiz): all 2136 jouyou kanji as tiles, by school grade. A kanji only gets a stamp from proof, never from having been seen:
+**Kanji** (the collection, also reached from the quiz): all 2136 jouyou kanji as tiles, by school grade. A kanji only gets a stamp from proof, never from having been seen:
 - **Red stamp:** you won a quiz round with it, or you know at least one word with it (from Anki, jpdb, WaniKani, a word list, or set to *Known* by hand; a made card counts).
 - **Gold stamp:** you know three different words with it, or you won quiz rounds on three different days. A round raises the kanji one box at most once a day, and a lost round sets it back one box, so gold cannot be rushed.
 - **Outlined tile:** it appeared in something you marked or read, but has no stamp yet. Faint tile: not met yet.
@@ -503,7 +505,7 @@ Every option in **Settings**, in the order of the screen. Settings that belong t
 
 | Section | Option (default) | What it does |
 |---|---|---|
-| **Progress** | Daily goal XP (40) | Fills the ring on Insights. About 40 XP is 20 reviews and a few marks; a card is worth 10. |
+| **Progress** | Daily goal XP (40) | Fills the ring on Study → Progress. About 40 XP is 20 reviews and a few marks; a card is worth 10. |
 | **Reminder** | Remind me when the goal is open (off) | One notification a day, only if you have not reached your goal. The laptop has to be on. |
 | | Time (19:00) | When the reminder is sent (laptop time). |
 | | Allow notifications on this device | Per device. On iPhone: Share → Add to Home Screen first, then open Horu from the home screen (iOS 16.4 or newer). *Send a test notification* checks it. |

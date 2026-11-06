@@ -12,20 +12,21 @@ import { History } from './screens/History.tsx';
 import { InboxItem } from './screens/InboxItem.tsx';
 import { Settings } from './screens/Settings.tsx';
 import { Manga } from './screens/Manga.tsx';
-import { Insights } from './screens/Insights.tsx';
 import { Texts } from './screens/Texts.tsx';
 import { Camera } from './screens/Camera.tsx';
-import { Practice } from './screens/Practice.tsx';
-import { Kanji } from './screens/Kanji.tsx';
+import { Study, partOf } from './screens/Study.tsx';
 
 // Once per start: the laptop's Anki note type, deck and learner profile, for cards the phone builds itself.
 let learned = false;
+
+/** The Study tab, under its old names too (insights, practice, kanji) so saved links keep working. */
+const STUDY = new Set(['study', 'insights', 'practice', 'kanji']);
 
 const TABS = [
   { path: 'watch', label: 'Watch', icon: 'watch' },
   { path: 'inbox', label: 'Inbox', icon: 'inbox' },
   { path: 'manga', label: 'Read', icon: 'book' },
-  { path: 'insights', label: 'Insights', icon: 'chart' },
+  { path: 'study', label: 'Study', icon: 'card' },
   { path: 'settings', label: 'Settings', icon: 'settings' },
 ];
 
@@ -121,16 +122,14 @@ export function App() {
         {page === 'manga' && <Manga route={route.slice(1)} online={!offline} />}
         {page === 'texts' && <Texts id={arg} />}
         {page === 'camera' && <Camera />}
-        {page === 'insights' && <Insights />}
-        {page === 'practice' && <Practice startOn={arg === 'quiz' ? 'quiz' : undefined} />}
-        {page === 'kanji' && <Kanji />}
+        {STUDY.has(page) && <Study {...partOf(page, arg)} />}
         {page === 'settings' && <Settings status={status} />}
       </main>
       {toast && <div className="toast top">{toast}</div>}
       <nav className="tabbar">
         <div className="tabbar-inner">
           {TABS.map((t) => {
-            const active = page === t.path || (t.path === 'inbox' && page === 'history') || (t.path === 'manga' && (page === 'texts' || page === 'camera')) || (t.path === 'insights' && (page === 'practice' || page === 'kanji'));
+            const active = page === t.path || (t.path === 'inbox' && page === 'history') || (t.path === 'manga' && (page === 'texts' || page === 'camera')) || (t.path === 'study' && STUDY.has(page));
             return (
               <a key={t.path} href={`#/${t.path}`} className={active ? 'active' : ''} aria-current={active ? 'page' : undefined}>
                 <Icon name={t.icon} size={25} weight={1.5} />
