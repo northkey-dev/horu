@@ -1,11 +1,10 @@
-import { kanjiOf, type KanjiInfo } from './kanji.ts';
+import type { KanjiInfo } from './kanji.ts';
 
-// What the reader can really read, kanji by kanji: the collection of stamps. A kanji earns a stamp from evidence,
-// never from having been seen:
-//   - the quiz: meaning and reading both right in a round. A round raises the kanji one box, at most once a day, so
-//     the gold stamp (box 3) takes three days of being right; a wrong round sets it back one box.
-//   - words you know from your own sources (Anki, jpdb, WaniKani, lists, set by hand). The JLPT starter list is
-//     an assumption, not evidence, and does not count.
+// What the reader can really read, kanji by kanji: the collection of stamps. A kanji earns a stamp only by being
+// answered in the quiz (meaning and reading both right in a round). A round raises the kanji one box, at most once a
+// day, so the gold stamp (box 3) takes three days of being right; a wrong round sets it back one box.
+// Nothing else counts: not having seen the kanji, not a word in Anki (it is there after one review, forgotten or not),
+// and not the JLPT starter list (an assumption).
 
 export type Skill = { box: number; /** Day (YYYY-MM-DD) of the last round */ at: string; right: number; wrong: number };
 export type SkillMap = Record<string, Skill>;
@@ -13,12 +12,9 @@ export type SkillMap = Record<string, Skill>;
 export type Level = 0 | 1 | 2;
 
 export const GOLD_BOX = 3;
-export const GOLD_WORDS = 3;
 
-export function levelOf(skill: Skill | undefined, knownWords = 0): Level {
-  const quiz = !skill ? 0 : skill.box >= GOLD_BOX ? 2 : skill.box >= 1 ? 1 : 0;
-  const words = knownWords >= GOLD_WORDS ? 2 : knownWords >= 1 ? 1 : 0;
-  return Math.max(quiz, words) as Level;
+export function levelOf(skill: Skill | undefined): Level {
+  return !skill ? 0 : skill.box >= GOLD_BOX ? 2 : skill.box >= 1 ? 1 : 0;
 }
 
 /** The skill after a round. A right round counts for the box once per day; a wrong one always sets it back. */
@@ -38,21 +34,14 @@ export function mergeSkill(a: SkillMap, b: SkillMap): SkillMap {
   return out;
 }
 
-/** How many different known words each kanji appears in. */
-export function evidenceOf(words: Iterable<string>): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const w of new Set(words)) for (const k of kanjiOf(w)) out[k] = (out[k] ?? 0) + 1;
-  return out;
-}
-
 /**
  * The kanji for a quiz round: first those without a stamp, then stamped ones whose next box is due (not done today),
  * the lowest box first. `pool` is in the order of priority already (for example most frequent in your marks first).
  */
-export function pickKanji(pool: string[], skill: SkillMap, evidence: Record<string, number>, day: string, count: number): string[] {
-  const fresh = pool.filter((k) => levelOf(skill[k], evidence[k]) === 0);
+export function pickKanji(pool: string[], skill: SkillMap, day: string, count: number): string[] {
+  const fresh = pool.filter((k) => levelOf(skill[k]) === 0);
   const due = pool
-    .filter((k) => levelOf(skill[k], evidence[k]) > 0 && skill[k] && skill[k].box < GOLD_BOX && skill[k].at !== day)
+    .filter((k) => levelOf(skill[k]) > 0 && skill[k] && skill[k].box < GOLD_BOX && skill[k].at !== day)
     .sort((a, b) => skill[a].box - skill[b].box);
   return [...fresh, ...due].slice(0, count);
 }
@@ -61,7 +50,10 @@ export type Question = { kanji: string; kind: 'meaning' | 'reading'; answer: str
 
 const stem = (kun: string) => kun.replace(/^-/, '').split('.')[0];
 
-/** The reading shown for a kanji: its first on'yomi and kun'yomi, like カ · ひ. */
+/** A kun'yomi as printed in dictionaries, the okurigana in brackets: ひ.く becomes ひ(く). */
+export const kunShown = (kun: string): string => kun.replace(/\.(.+)$/, '($1)');
+
+/** The reading used in the quiz for a kanji: its first on'yomi and kun'yomi, like カ · ひ. */
 export function readingOf(info: KanjiInfo): string {
   const parts = [info.on[0], info.kun[0] && stem(info.kun[0])].filter(Boolean);
   return parts.join(' · ');

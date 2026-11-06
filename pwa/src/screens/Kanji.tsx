@@ -7,7 +7,7 @@ import { Sheet } from '../components/Sheet.tsx';
 import { Stamp } from '../components/Stamp.tsx';
 import { navigate } from '../lib/hooks.ts';
 import { kanjiOf, type KanjiInfo } from '../../../shared/kanji.ts';
-import { gradeGroups, readingOf, type Level } from '../../../shared/kanjiSkill.ts';
+import { gradeGroups, kunShown, type Level } from '../../../shared/kanjiSkill.ts';
 
 // The collection: every jouyou kanji (2136) as a tile. Red once you can read it, gold once you can read it for good,
 // outlined once it appeared in something you marked or read, faint before that. Nothing is filled in for you.
@@ -86,8 +86,13 @@ export function Kanji({ embedded = false }: { embedded?: boolean }) {
           <div className="row" style={{ gap: 16, alignItems: 'center' }}>
             <Stamp kanji={open} level={levels[open] as Level} size={72} still />
             <div className="grow">
-              <b>{info.meanings.slice(0, 3).join(', ')}</b>
-              <div className="muted jp">{readingOf(info)}</div>
+              <b>{info.meanings.slice(0, 4).join(', ')}</b>
+              <div className="kanji-readings">
+                <span className="muted small">On</span>
+                <span className="jp">{info.on.length ? info.on.slice(0, 6).join('、') : '–'}</span>
+                <span className="muted small">Kun</span>
+                <span className="jp">{info.kun.length ? info.kun.slice(0, 6).map(kunShown).join('、') : '–'}</span>
+              </div>
               <div className="muted small">{statusLine(levels[open], data.collection, open)}</div>
             </div>
           </div>
@@ -98,12 +103,6 @@ export function Kanji({ embedded = false }: { embedded?: boolean }) {
 }
 
 function statusLine(level: Level, c: Collection, k: string): string {
-  const words = c.evidence[k] ?? 0;
   const box = c.skill[k]?.box ?? 0;
-  const parts = [
-    level === 2 ? 'Gold stamp' : level === 1 ? 'Stamped' : 'No stamp yet',
-    words ? `in ${words} word${words === 1 ? '' : 's'} you know` : '',
-    box ? `quiz box ${box} of 3` : '',
-  ];
-  return parts.filter(Boolean).join(' · ');
+  return [level === 2 ? 'Gold stamp' : level === 1 ? 'Stamped' : 'No stamp yet: the quiz gives it', box ? `quiz box ${box} of 3` : ''].filter(Boolean).join(' · ');
 }

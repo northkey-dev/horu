@@ -267,10 +267,9 @@ export const api = {
   rateAnswer: (ref: string, rating: 1 | -1) => request('POST', '/api/ai/rate', { ref, rating }),
   /** Hands the laptop an answer this phone got from its own key, for its AI log (kept for later when it is away) */
   recordAnswer: (body: { kind: 'explain' | 'translate'; engine: string; model: string; profile: string; input: unknown; output: unknown }) => orLater('POST', '/api/ai/record', body),
-  /** The kanji collection: quiz progress (the laptop keeps a copy) and what the laptop's known words prove */
+  /** The kanji collection: quiz progress (the laptop keeps a copy) */
   kanjiSkill: () => request<import('../../../shared/kanjiSkill.ts').SkillMap>('GET', '/api/kanji/skill'),
   putKanjiSkill: (skill: import('../../../shared/kanjiSkill.ts').SkillMap) => request<import('../../../shared/kanjiSkill.ts').SkillMap>('PUT', '/api/kanji/skill', skill),
-  kanjiEvidence: () => request<Record<string, number>>('GET', '/api/kanji/evidence'),
   /** Settings → Check everything */
   doctor: () => request<{ name: string; state: 'ok' | 'warn' | 'bad'; detail: string; fix?: string }[]>('GET', '/api/doctor', undefined, {}, 30_000),
   aiStats: () => request<{ count: number; good: number; bad: number }>('GET', '/api/ai/stats'),

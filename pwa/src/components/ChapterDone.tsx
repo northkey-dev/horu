@@ -107,7 +107,7 @@ export function ChapterDone({ title, chapter, pct, history, readable, stamps, co
       ) : (
         <div className="cd-caption">Your first chapter here. Next time you will see how it grows.</div>
       )}
-      {readable && readable.total > 0 && (
+      {readable && readable.have > 0 && (
         <div className="cd-caption">
           You can read {readable.have} of {readable.total} kanji in this chapter
         </div>

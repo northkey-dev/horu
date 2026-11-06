@@ -1,16 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { afterRound, evidenceOf, levelOf, mergeSkill, pickKanji, questionsFor, readingOf } from '../../shared/kanjiSkill.ts';
+import { afterRound, kunShown, levelOf, mergeSkill, pickKanji, questionsFor, readingOf } from '../../shared/kanjiSkill.ts';
 
-test('a stamp needs evidence: quiz box or known words, never just having seen it', () => {
-  assert.equal(levelOf(undefined, 0), 0);
-  assert.equal(levelOf({ box: 0, at: 'd', right: 0, wrong: 1 }, 0), 0);
-  assert.equal(levelOf({ box: 1, at: 'd', right: 1, wrong: 0 }, 0), 1);
-  assert.equal(levelOf({ box: 3, at: 'd', right: 3, wrong: 0 }, 0), 2);
-  assert.equal(levelOf(undefined, 1), 1);
-  assert.equal(levelOf(undefined, 2), 1);
-  assert.equal(levelOf(undefined, 3), 2);
-  assert.equal(levelOf({ box: 1, at: 'd', right: 1, wrong: 0 }, 3), 2, 'the better evidence counts');
+test('a stamp comes from the quiz only, never from having seen the kanji', () => {
+  assert.equal(levelOf(undefined), 0);
+  assert.equal(levelOf({ box: 0, at: 'd', right: 0, wrong: 1 }), 0);
+  assert.equal(levelOf({ box: 1, at: 'd', right: 1, wrong: 0 }), 1);
+  assert.equal(levelOf({ box: 2, at: 'd', right: 2, wrong: 0 }), 1);
+  assert.equal(levelOf({ box: 3, at: 'd', right: 3, wrong: 0 }), 2);
 });
 
 test('rounds: one box a day, gold takes three days, a miss sets back one box', () => {
@@ -37,10 +34,6 @@ test('two copies merge per kanji, the later round wins', () => {
   assert.equal(m['火'].box, 1);
 });
 
-test('evidence counts different known words per kanji', () => {
-  assert.deepEqual(evidenceOf(['日本', '日', '日本', '本屋']), { 日: 2, 本: 2, 屋: 1 });
-});
-
 test('quiz pick: kanji without a stamp first, then due ones by box, nothing done today', () => {
   const skill = {
     二: { box: 1, at: '2026-11-05', right: 1, wrong: 0 },
@@ -48,9 +41,8 @@ test('quiz pick: kanji without a stamp first, then due ones by box, nothing done
     四: { box: 1, at: '2026-11-06', right: 1, wrong: 0 },
     五: { box: 3, at: '2026-11-05', right: 3, wrong: 0 },
   };
-  assert.deepEqual(pickKanji(['三', '一', '二', '四', '五', '六'], skill, {}, '2026-11-06', 10), ['一', '六', '二', '三']);
-  assert.deepEqual(pickKanji(['一', '六'], skill, { 一: 1 }, '2026-11-06', 10), ['六'], 'a kanji from a known word has its stamp');
-  assert.equal(pickKanji(['一', '六'], skill, {}, '2026-11-06', 1).length, 1);
+  assert.deepEqual(pickKanji(['三', '一', '二', '四', '五', '六'], skill, '2026-11-06', 10), ['一', '六', '二', '三']);
+  assert.equal(pickKanji(['一', '六'], skill, '2026-11-06', 1).length, 1);
 });
 
 const dic = Object.fromEntries(
@@ -95,4 +87,10 @@ test('grade groups: only jouyou kanji, by grade, the easier JLPT ones first', ()
   assert.deepEqual(g.find((x) => x.grade === 1).kanji, ['一', '九', '左']);
   assert.deepEqual(g.find((x) => x.grade === 8).kanji, ['憂']);
   assert.ok(!g.some((x) => x.kanji.includes('薔')));
+});
+
+test('kun yomi are shown with the okurigana in brackets', () => {
+  assert.equal(kunShown('ひ.く'), 'ひ(く)');
+  assert.equal(kunShown('-び'), '-び');
+  assert.equal(kunShown('はい.る'), 'はい(る)');
 });

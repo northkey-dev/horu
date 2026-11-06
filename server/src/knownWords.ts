@@ -110,19 +110,6 @@ export async function knownSet(): Promise<Set<string>> {
   return set;
 }
 
-/**
- * Words the user really knows, for the kanji collection: Anki, jpdb, WaniKani, lists and words set to Known by hand
- * (a card made counts). The JLPT starter list is left out on purpose: it is an assumption, not something learned.
- */
-export function evidenceWords(): string[] {
-  const set = new Set<string>([...db.anki, ...Object.values(db.imported).flatMap((i) => i?.words ?? [])]);
-  for (const [w, s] of Object.entries(db.status)) {
-    if (isUnderstood(s)) set.add(w);
-    else set.delete(w);
-  }
-  return [...set];
-}
-
 /** Status the user set by hand (word → status). */
 export const statusMap = (): Readonly<Record<string, WordStatus>> => db.status;
 

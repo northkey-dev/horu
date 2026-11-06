@@ -1,39 +1,32 @@
 import { api } from './api.ts';
 import { loadKanjidic } from './japanese.ts';
 import { recall, remember } from './mirror.ts';
-import { ownKnownWords } from './words.ts';
-import { afterRound, evidenceOf, levelOf, mergeSkill, type Level, type SkillMap } from '../../../shared/kanjiSkill.ts';
+import { afterRound, levelOf, mergeSkill, type Level, type SkillMap } from '../../../shared/kanjiSkill.ts';
 import { kanjiOf } from '../../../shared/kanji.ts';
 
-// The kanji collection on the phone: quiz progress (a copy lives on the laptop), the words you know that prove a
-// kanji, and the small memories the chapter end needs. Works without the laptop.
+// The kanji collection on the phone: quiz progress (a copy lives on the laptop) and the small memories the chapter
+// end needs. Works without the laptop.
 
-export type Collection = { skill: SkillMap; evidence: Record<string, number> };
+export type Collection = { skill: SkillMap };
 
 export const today = (): string => new Date().toLocaleDateString('sv');
 
-/** The quiz progress and the evidence, fresh from the laptop when it answers, else as last saved. */
+/** The quiz progress, fresh from the laptop when it answers, else as last saved. */
 export async function loadCollection(): Promise<Collection> {
   const mine = (await recall<SkillMap>('kanji-skill'))?.value ?? {};
   let skill = mine;
-  let evidence = (await recall<Record<string, number>>('kanji-evidence'))?.value ?? {};
   try {
     const theirs = await api.kanjiSkill();
     skill = mergeSkill(mine, theirs);
-    evidence = await api.kanjiEvidence();
-    void remember('kanji-evidence', evidence);
     if (JSON.stringify(skill) !== JSON.stringify(theirs)) void api.putKanjiSkill(skill).catch(() => undefined);
   } catch {
     // the laptop is away: what the phone has
   }
   void remember('kanji-skill', skill);
-  const own = evidenceOf(await ownKnownWords());
-  evidence = { ...evidence };
-  for (const [k, n] of Object.entries(own)) evidence[k] = Math.max(evidence[k] ?? 0, n);
-  return { skill, evidence };
+  return { skill };
 }
 
-export const levelsOf = (c: Collection, kanji: string[]): Record<string, Level> => Object.fromEntries(kanji.map((k) => [k, levelOf(c.skill[k], c.evidence[k])]));
+export const levelsOf = (c: Collection, kanji: string[]): Record<string, Level> => Object.fromEntries(kanji.map((k) => [k, levelOf(c.skill[k])]));
 
 /** Stamps the whole collection has: kanji at level 1 or 2 among the given ones. */
 export const stampedCount = (levels: Record<string, Level>): number => Object.values(levels).filter((l) => l > 0).length;
@@ -75,7 +68,7 @@ export async function chapterStamps(words: string[]): Promise<{ stamps: Stamp[];
   const chapter = kanjiOf(words.join(''));
   void addSeen(chapter);
   const everything = Object.keys(dic).filter((k) => (dic[k].grade ?? 0) >= 1 && dic[k].grade! <= 8);
-  const levels = levelsOf(c, [...new Set([...everything, ...Object.keys(c.skill), ...Object.keys(c.evidence)])]);
+  const levels = levelsOf(c, [...new Set([...everything, ...Object.keys(c.skill)])]);
   const last = (await recall<Record<string, Level>>('kanji-levels'))?.value;
   const inCollection = new Set(everything);
   const now = Object.fromEntries(Object.entries(levels).filter(([k, l]) => l > 0 && inCollection.has(k)));

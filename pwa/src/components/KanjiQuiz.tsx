@@ -11,7 +11,8 @@ import { levelOf, pickKanji, questionsFor, type Level, type Question } from '../
 // round is what raises a kanji's box (shared/kanjiSkill.ts). The first round gives the red stamp, on the spot.
 
 const ROUND = 8;
-type QuizSet = 'marks' | 'n5' | 'n4';
+type QuizSet = 'marks' | 'n5' | 'n4' | `g${1 | 2 | 3 | 4 | 5 | 6}`;
+const GRADES = [1, 2, 3, 4, 5, 6] as const;
 const SETS: { id: QuizSet; label: string }[] = [
   { id: 'marks', label: 'Kanji from my marks' },
   { id: 'n5', label: 'JLPT N5 kanji' },
@@ -25,6 +26,10 @@ type Item = { kanji: string; questions: Question[] };
 async function poolOf(set: QuizSet, dic: Dic): Promise<string[]> {
   if (set === 'n5') return Object.keys(dic).filter((k) => dic[k].jlpt === 4);
   if (set === 'n4') return Object.keys(dic).filter((k) => dic[k].jlpt === 3);
+  if (set !== 'marks') {
+    const grade = Number(set.slice(1));
+    return Object.keys(dic).filter((k) => dic[k].grade === grade).sort((a, b) => (dic[b].jlpt ?? 0) - (dic[a].jlpt ?? 0));
+  }
   const counts = new Map<string, number>();
   for (const m of await api.moments(300)) {
     if (m.status === 'discarded') continue;
@@ -60,8 +65,8 @@ export function KanjiQuiz() {
     setError(undefined);
     try {
       const pool = await poolOf(set, dic);
-      const picked = pickKanji(pool, collection.skill, collection.evidence, today(), ROUND);
-      if (!picked.length) throw new Error(set === 'marks' ? 'Nothing to quiz yet: mark some sentences first, or pick a JLPT set.' : 'Everything in this set has its stamp for today. Come back tomorrow, or pick another set.');
+      const picked = pickKanji(pool, collection.skill, today(), ROUND);
+      if (!picked.length) throw new Error(set === 'marks' ? 'Nothing to quiz yet: mark some sentences first, or pick a JLPT set.' : 'Everything in this set has been done today. Come back tomorrow, or pick another set.');
       // Wrong options come from the same set when it is big enough, else from the school kanji.
       const school = Object.keys(dic).filter((k) => (dic[k].grade ?? 99) <= 4);
       const choices = pool.length >= 12 ? pool : [...pool, ...school];
@@ -93,10 +98,10 @@ export function KanjiQuiz() {
       return;
     }
     // The kanji is finished: the round counts.
-    const before = levelOf(collection.skill[item.kanji], collection.evidence[item.kanji]);
+    const before = levelOf(collection.skill[item.kanji]);
     const updated = await saveRound(collection, item.kanji, both);
     setCollection(updated);
-    const after = levelOf(updated.skill[item.kanji], updated.evidence[item.kanji]);
+    const after = levelOf(updated.skill[item.kanji]);
     if (both) setPassed((n) => n + 1);
     const last = at.item === items.length - 1;
     const advance = () => {
@@ -200,6 +205,14 @@ function Choose({ onPick, busy }: { onPick: (set: QuizSet) => void; busy: boolea
         {SETS.map((s) => (
           <button key={s.id} className="list-item action-row" disabled={busy} onClick={() => onPick(s.id)}>
             {s.label}
+          </button>
+        ))}
+      </div>
+      <p className="hint" style={{ marginTop: 16 }}>By school grade (grade 1 is the easiest):</p>
+      <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+        {GRADES.map((g) => (
+          <button key={g} className="small grow" disabled={busy} onClick={() => onPick(`g${g}`)}>
+            Grade {g}
           </button>
         ))}
       </div>

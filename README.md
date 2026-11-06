@@ -108,12 +108,12 @@ The fourth tab, **Study**, has three parts at the top: **Practice** (what you do
 - **Kanji quiz:** a round is 8 kanji from your marks, or from the JLPT N5 or N4 list. For each kanji two questions with four choices: what it means, how it is read. Both right wins the round and gives the kanji its first stamp on the spot.
 - **Learn first:** the kanji in your marks that no word you know contains, with meaning, readings and an example, the most frequent first.
 
-**Kanji** (the collection, also reached from the quiz): all 2136 jouyou kanji as tiles, by school grade. A kanji only gets a stamp from proof, never from having been seen:
-- **Red stamp:** you won a quiz round with it, or you know at least one word with it (from Anki, jpdb, WaniKani, a word list, or set to *Known* by hand; a made card counts).
-- **Gold stamp:** you know three different words with it, or you won quiz rounds on three different days. A round raises the kanji one box at most once a day, and a lost round sets it back one box, so gold cannot be rushed.
+**Kanji** (the collection, also reached from the quiz): all 2136 jouyou kanji as tiles, by school grade. A kanji only gets a stamp by being answered in the quiz, never from having been seen and not from Anki (a card there counts after one review, even if you forgot it since) or the JLPT starter list:
+- **Red stamp:** you won a quiz round with it (meaning and reading both right).
+- **Gold stamp:** you won rounds on three different days. A round raises the kanji one box at most once a day, and a lost round sets it back one box, so gold cannot be rushed.
 - **Outlined tile:** it appeared in something you marked or read, but has no stamp yet. Faint tile: not met yet.
-- The JLPT N5/N4 starter list (*Known words → JLPT baseline*) does **not** count here: it only assumes you know those words. Tap a tile for its meaning, reading and why it has its stamp.
-The quiz progress is kept on the phone and copied to the laptop (`data/kanji-skill.json`, part of the backup).
+- Tap a tile for its meaning, its on'yomi and kun'yomi (okurigana in brackets, *ひ(く)*) and its box.
+The quiz takes 8 kanji a round from your marks, JLPT N5, N4 or a school grade (1 to 6). The quiz progress is kept on the phone and copied to the laptop (`data/kanji-skill.json`, part of the backup).
 
 ## The inbox
 

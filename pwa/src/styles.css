@@ -776,3 +776,5 @@ button.ghost.on { color: var(--accent); font-weight: 600; }
 .cd-stamps { margin-top: 26px; max-width: 340px; }
 .cd-count { font-size: 48px; margin: 30px 0 0; }
 .cd-count span { font-size: 22px; }
+
+.kanji-readings { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: baseline; margin: 6px 0; font-size: 17px; }
