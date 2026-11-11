@@ -9,6 +9,11 @@ Horu is a web app for your phone (it installs to the home screen). It runs on it
 > Status: personal project, used daily, now open for anyone who finds it useful. Japanese only (JMdict, kuromoji, Jimaku).
 
 <p align="center">
+  <a href="https://youtu.be/YYM6f2bTK-4"><img src="docs/img/trailer.jpg" width="70%" alt="Horu trailer on YouTube (1:46)"></a>
+  <br><sub>Trailer (1:46)</sub>
+</p>
+
+<p align="center">
   <img src="docs/img/word.jpg" width="23%" alt="Word sheet with dictionary entry and word status">
   <img src="docs/img/translate.jpg" width="23%" alt="Manga speech bubble with translation and word by word list">
   <img src="docs/img/chapter-end.jpg" width="23%" alt="End of a chapter: 89% of the words understood">
