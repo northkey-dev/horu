@@ -28,6 +28,9 @@ export function About() {
         <a className="list-item action-row" href={`${REPO}/issues/new/choose`} target="_blank" rel="noreferrer">
           Report a problem
         </a>
+        <a className="list-item action-row" href="https://ko-fi.com/northkeydev" target="_blank" rel="noreferrer">
+          Support Horu on Ko-fi
+        </a>
       </div>
       <p className="footnote">
         Horu ships no anime, manga, subtitles or audio. It works on what you bring, and you are responsible for where it comes from and for the terms of the services you use. It has no account, no analytics and no server of ours.

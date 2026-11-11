@@ -8,6 +8,8 @@ Horu is a web app for your phone (it installs to the home screen). It runs on it
 
 > Status: personal project, used daily, now open for anyone who finds it useful. Japanese only (JMdict, kuromoji, Jimaku).
 
+[![Support Horu on Ko-fi](https://img.shields.io/badge/Ko--fi-Support_Horu-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/northkeydev)
+
 <p align="center">
   <a href="https://youtu.be/YYM6f2bTK-4"><img src="docs/img/trailer.jpg" width="70%" alt="Horu trailer on YouTube (1:46)"></a>
   <br><sub>Trailer (1:46)</sub>

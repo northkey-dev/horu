@@ -2,6 +2,10 @@
 
 Release numbers follow `package.json`. The app, the laptop service and the Chrome extension share one number.
 
+## 1.0.3 (2026-11-11)
+
+Support link: Ko-fi (README badge, repository sponsor button, Settings → About).
+
 ## 1.0.2 (2026-11-11)
 
 README: trailer link.
