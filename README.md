@@ -8,7 +8,9 @@ Horu is a web app for your phone (it installs to the home screen). It runs on it
 
 > Status: personal project, used daily, now open for anyone who finds it useful. Japanese only (JMdict, kuromoji, Jimaku).
 
-[![Support Horu on Ko-fi](https://img.shields.io/badge/Ko--fi-Support_Horu-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/northkeydev)
+[![GitHub stars](https://img.shields.io/github/stars/northkey-dev/horu?style=flat&logo=github&label=Star%20Horu)](https://github.com/northkey-dev/horu) [![Support Horu on Ko-fi](https://img.shields.io/badge/Ko--fi-Support_Horu-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/northkeydev)
+
+If Horu helps your studying, a ⭐ star above helps other learners find it. Thank you!
 
 <p align="center">
   <a href="https://youtu.be/YYM6f2bTK-4"><img src="docs/img/trailer.jpg" width="70%" alt="Horu trailer on YouTube (1:46)"></a>
