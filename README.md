@@ -679,3 +679,7 @@ Development: `npm run dev -w pwa` (app on :5173, proxies the service on :7317), 
 ## Licence
 
 [GPL-3.0-or-later](LICENSE). You may use, change and share Horu; changed versions you distribute must stay open under the same licence.
+
+## Support
+
+Horu is free and made in spare time. If it helps your studying, a ⭐ star on GitHub is a lovely thank-you and helps other learners find it. Bugs and ideas are welcome as [issues](https://github.com/northkey-dev/horu/issues/new/choose). If you want to do more, [Ko-fi](https://ko-fi.com/northkeydev) keeps it maintained.

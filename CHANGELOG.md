@@ -4,7 +4,7 @@ Release numbers follow `package.json`. The app, the laptop service and the Chrom
 
 ## 1.0.3 (2026-11-11)
 
-Support link: Ko-fi (README badge, repository sponsor button, Settings → About).
+Support link: Ko-fi (README badge, repository sponsor button, Settings → About) and a *Support* section in the README.
 
 ## 1.0.2 (2026-11-11)
 
