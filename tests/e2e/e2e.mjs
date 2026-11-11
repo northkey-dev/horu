@@ -122,6 +122,9 @@ try {
   });
 
   await step('Settings: test deck + kanji cards, saved', async () => {
+    // The laptop's card settings live under the Cards tab.
+    await phone.evaluate(() => [...document.querySelectorAll('[role=tab]')].find((b) => /^cards$/i.test(b.textContent)).click());
+    await sleep(300);
     await phone.evaluate((deck) => {
       const input = [...document.querySelectorAll('label.field')].find((l) => l.textContent.includes('Anki deck')).querySelector('input');
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;

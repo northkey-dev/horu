@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useEventTick } from '../lib/hooks.ts';
+import { buildBackup, restoreBackup } from '../lib/backup.ts';
+import { shareFile } from '../lib/cards.ts';
 import { localMoments, phoneJimakuKey, quickContinue, setPhoneJimakuKey, setQuickContinue, setTranslatesAhead, setWordByWord, translatesAhead, wordByWord } from '../lib/phone.ts';
 
 // Settings → This phone: what the phone needs to watch without the laptop. Stored on the phone only.
@@ -49,6 +51,58 @@ export function PhoneSettings() {
         )}
       </div>
       <p className="footnote">Used when the episode runs on a TV or the laptop is off: the phone loads subtitles itself and keeps your marks until the laptop is back.</p>
+      <PhoneBackup />
+    </>
+  );
+}
+
+/** Everything that lives only on this phone, as one file: for a new phone, or if the browser clears its storage. */
+function PhoneBackup() {
+  const [note, setNote] = useState<string>();
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    setBusy(true);
+    setNote(undefined);
+    try {
+      const { file, summary } = await buildBackup();
+      if (await shareFile(file)) setNote(`Saved ${file.name}: ${summary}.`);
+    } catch (e) {
+      setNote((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function restore(file?: File) {
+    if (!file) return;
+    setBusy(true);
+    setNote(undefined);
+    try {
+      setNote(await restoreBackup(file));
+      setTimeout(() => location.reload(), 1800);
+    } catch (e) {
+      setNote((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <h2>Backup of this phone</h2>
+      <div className="group">
+        <button className="list-item action-row" onClick={save} disabled={busy}>
+          Save a backup file
+        </button>
+        <label className="list-item action-row">
+          Restore from a backup file
+          <input type="file" accept="application/json,.json" hidden disabled={busy} onChange={(e) => void restore(e.target.files?.[0]).then(() => (e.target.value = ''))} />
+        </label>
+      </div>
+      <p className="footnote">
+        {note ?? 'Marks and sessions waiting for the laptop, texts, word status, kanji progress, cards waiting for an export, reader notes and these settings. Not in it: keys, the laptop pairing, dictionaries, downloaded manga and the recordings of audio texts. Restoring adds to what the phone has; nothing is deleted. Keep the file in Files or iCloud Drive.'}
+      </p>
     </>
   );
 }

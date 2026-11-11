@@ -167,7 +167,7 @@ function Library() {
       {(photoHelp || laptopUp()) && (
         <p className="footnote">
           {laptopUp() ? 'Photos are read by the laptop. ' : ''}On the phone alone: open the photo in Photos (or point the camera at the page), touch and hold the text → Select All → Copy, then tap
-          Paste from clipboard. The phone recognises the text itself (Live Text on iPhone, Google Lens on Android).
+          Paste from clipboard. The phone recognises the text itself (Live Text on iPhone, Google Lens on Android). A web article: in Safari open the Reader view, select all, copy. The Kindle app does not allow copying: photograph or screenshot the page and use Live Text.
         </p>
       )}
       <input

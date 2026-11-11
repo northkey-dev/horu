@@ -8,14 +8,22 @@ Horu is a web app for your phone (it installs to the home screen). It runs on it
 
 > Status: personal project, used daily, now open for anyone who finds it useful. Japanese only (JMdict, kuromoji, Jimaku).
 
-**Contents:** [What it does](#what-it-does) · [Two ways to use it](#two-ways-to-use-it) · [Furigana on the cards](#furigana-on-the-cards) · [Manga](#manga) · [Camera](#camera) · [Raspberry Pi / Docker](#raspberry-pi--docker) · [Updating](#updating) · [Settings reference](#settings-reference) · [Privacy](#privacy) · [Your own copy](#your-own-copy-of-the-app)
+<p align="center">
+  <img src="docs/img/word.jpg" width="23%" alt="Word sheet with dictionary entry and word status">
+  <img src="docs/img/translate.jpg" width="23%" alt="Manga speech bubble with translation and word by word list">
+  <img src="docs/img/chapter-end.jpg" width="23%" alt="End of a chapter: 89% of the words understood">
+  <img src="docs/img/progress.jpg" width="23%" alt="Study tab: streak, XP and daily goal">
+</p>
+<p align="center"><sub>Word sheet · translate a speech bubble · end of a chapter · progress. Demo manga: “Pepper&amp;Carrot” by David Revoy (CC BY 4.0).</sub></p>
+
+**Contents:** [What it does](#what-it-does) · [Two ways to use it](#two-ways-to-use-it) · [Furigana on the cards](#furigana-on-the-cards) · [Manga](#manga) · [Camera](#camera) · [Raspberry Pi / Docker](#raspberry-pi--docker) · [Updating](#updating) · [Settings reference](#settings-reference) · [Troubleshooting](#troubleshooting) · [Privacy](#privacy) · [Your own copy](#your-own-copy-of-the-app)
 
 ## What it does
 
 **Watching**
 - *TV or other screen*: start an episode on the phone, its clock runs with the episode (or follows Jellyfin, Plex, Kodi or mpv). Subtitles come from [Jimaku](https://jimaku.cc). A mark keeps the lines around that moment and, if you switch it on, the last 20 seconds of room audio from the microphone.
 - *On the phone itself* (Safari or a streaming app, fullscreen): when a line catches you, swipe to Horu; the video keeps playing small and Horu marks the moment you left. Or keep Horu open with the video in picture-in-picture, or mark with a double tap on the back of the phone (iOS Shortcut, needs the laptop).
-- *Laptop + Chrome*: the extension records the tab's audio, so a mark keeps the exact audio and a screenshot. It takes the Japanese subtitles the site itself shows or loads (YouTube, Netflix, Crunchyroll, most web players), so dramas and YouTube work without Jimaku. Whisper fills in lines when there are no subtitles, and picks the line you actually heard.
+- *Laptop + Chrome*: the extension records the tab's audio, so a mark keeps the exact audio and a screenshot. It takes the Japanese subtitles the site itself shows or loads (YouTube, Netflix, Crunchyroll, most web players), so dramas and YouTube work without Jimaku. Whisper fills in lines when there are no subtitles, and picks the line you actually heard. Two cases it handles for you: YouTube's *automatic* Japanese captions (speech recognition, often wrong) are not used, Whisper listens instead; and when none of the subtitle lines is close to what was said, the heard line is added and preselected. On **Netflix** choose the Japanese subtitles marked as captions (日本語 with 字幕ガイド / [CC]), not the freely translated 日本語 track: the first matches the sound.
 - *Laptop + Chrome, without touching the laptop:* **Watch → Start recording in Chrome** (or a Shortcut “Horu record”, see Settings → Laptop → *Mark without opening Horu*) makes the laptop press the extension's shortcut in the front Chrome window (Windows only; the video's tab must be the open one). Horu then reads the page, on any site: tab title, headings, the player's own title and the address words (never the site or the query) name show and episode, the laptop finds the show on Jimaku and loads its subtitles. The next episode is recognised by itself. A page without an episode number (a film, an overview page) is left alone, so choose those by hand. An episode you chose by hand is never replaced; a doubtful match gets a note with *Not right? Choose it yourself*.
 - Optional subtitle overlay over the video, with unknown words underlined.
 - Out of sync? Tap the subtitle line the moment you hear it.
@@ -51,7 +59,7 @@ There is no central Horu site: everyone runs their own copy. Without a laptop yo
 3. Settings → *Cards on this phone*: pick where cards go (an `.apkg` you open in AnkiMobile/AnkiDroid is the default) and who writes explanations (a free Gemini key, or copy prompt).
 4. Watch → *TV or other screen* → search the anime → *Start episode* → start the clock with the episode.
 
-Everything stays on the phone (IndexedDB). Without a laptop there is no screenshot, Whisper, manga text recognition or reminder.
+The first time the app opens it asks whether you use it phone only or with a laptop and shows these steps again. Everything stays on the phone (IndexedDB); *Settings → Phone → Backup of this phone* saves it to a file. Without a laptop there is no screenshot, Whisper, manga text recognition or reminder.
 
 ### With a laptop (Windows, macOS, Linux)
 
@@ -462,7 +470,7 @@ Horu shows its version number at the top of **Settings**: `App v…` is the app 
 
 ## Settings reference
 
-Every option in **Settings**, in the order of the screen. Settings that belong to the **laptop** appear only while the laptop is reachable; change them and tap **Save changes** at the bottom. Settings that belong to the **phone** save by themselves and stay on that phone.
+Every option in **Settings**. The page has six tabs (the last one you used stays open): **Phone** (this phone, cards made on the phone, manga reader, appearance, backup of the phone, install hints), **Laptop** (pairing, status and checks, modules, reminder, listening, backup, manga), **Cards** (deck, AI order, what a card gets, preparation, daily goal), **Words** (known words, dictionaries, import sentences), **Services** (Jimaku, media player, jpdb, webhook, AniList, manga server, game text) and **About** (version, licence, credits). Settings that belong to the **laptop** appear only while the laptop is reachable; change them and tap **Save changes** at the bottom. Settings that belong to the **phone** save by themselves and stay on that phone. The sections below keep the old order of the screen.
 
 **Top of the page:** the version line shows `App v…` and `Laptop v…`. If they differ, a note says which is older (see [Updating](#updating)).
 
@@ -542,6 +550,13 @@ Every option in **Settings**, in the order of the screen. Settings that belong t
 | | Extension repository | The address the manga sources are installed from. Horu ships none. |
 | | Suwayomi server (`http://127.0.0.1:4567`) | Address of Suwayomi; started automatically from `tools/suwayomi`. |
 
+### Phone backup and About
+
+| Section | What it does |
+|---|---|
+| **Backup of this phone** (Phone tab) | *Save a backup file* writes one `.json` with everything that lives only on this phone: marks and sessions waiting for the laptop, your texts, word status, kanji progress, cards waiting for an export, reader notes and these settings. Keys, the laptop pairing, dictionaries, downloaded manga and the recordings of audio texts are not in it. *Restore from a backup file* adds the file's data to what the phone has (nothing is deleted; where both have the same item the file wins). Use it before changing phones, or now and then if the phone is your only copy. Keep the file in Files or iCloud Drive. |
+| **About** (About tab) | Version, licence, link to the source and to *Report a problem*, and the licences of everything Horu is built on (JMdict and KANJIDIC2 are CC BY-SA 4.0 and need this notice). |
+
 ### Bottom of the page
 
 | Section | What it does |
@@ -565,18 +580,53 @@ The extension has one options page (the server address); otherwise it is control
 | Right-click → *Japanese subtitles over the recorded video* | Shows the subtitles as an overlay on the video, with unknown words underlined. |
 | Hover a word | The dictionary appears; from there you can send the sentence to your inbox. |
 
+## Troubleshooting
+
+Start with **Settings → Laptop → Check everything**: it tests each part and says what to do. Then:
+
+| Symptom | Cause and fix |
+|---|---|
+| The phone shows *Laptop not reachable* | Is Horu running on the laptop (tray icon)? Is the laptop awake? Is Tailscale connected on the phone (the app says whether it looks like no internet, no answer or no Tailscale)? Tap *Check again*. Marks and cards made meanwhile wait on the phone. |
+| Tailscale connected, but the app cannot reach the laptop | On the laptop run `tailscale serve --bg 7317` once and open the address it prints. The address in *Settings → Laptop* must be that `https://<name>.<tailnet>.ts.net`. |
+| No Tailscale, same Wi-Fi | Open `http://localhost:7317/pair` on the laptop and scan the lower code. The first time Windows asks about the firewall: allow it for private networks. Without https there is no offline mode, microphone or reminder. |
+| The phone's copy is outdated | Close the app fully and open it again (it updates itself when the laptop serves a newer build). *Settings* shows `App v…` and `Laptop v…`. After updating the laptop restart Horu there. |
+| *ffmpeg not found* / no audio in cards | Install ffmpeg (`winget install Gyan.FFmpeg`, `brew install ffmpeg`, or your package manager) and restart Horu. The check lists it. |
+| The extension does not record | In `chrome://extensions` reload Horu after every update and allow the permissions it asks for (reading network requests). Check the shortcut at `chrome://extensions/shortcuts`: `Ctrl+Shift+H` works everywhere, `Alt+Shift+H` is swallowed by some Chrome versions. Videos shorter than 30 s are ignored. |
+| The extension says it cannot reach Horu | Options page of the extension: the server address is empty for this computer, or the address of your Pi (with token when it is reached without Tailscale). *Test connection* tells. |
+| No subtitles for a series | Check the Jimaku key (Settings → Services, or Phone tab on the phone). Search with the Japanese or romaji title. Or upload the `.srt`/`.ass` file under the episode. |
+| Cards do not reach Anki | Anki must have the AnkiConnect add-on (code 2055492159); Horu starts Anki itself on the laptop. With phone-made cards choose *.apkg* and open the file in AnkiMobile/AnkiDroid. |
+| Reminders do not arrive | iPhone: Add to Home Screen first (iOS 16.4+), open Horu from there, then *Settings → Laptop → Reminder → Allow notifications on this device*. The laptop has to be on at the reminder time. |
+| The phone lost everything | Settings → Phone → *Restore from a backup file* (if you saved one). The laptop's own backups are under *Settings → Laptop → Backup → Restore*. |
+
+Still stuck? Open an issue with what you did, what happened and what you expected, plus the output of *Check everything* (it contains no keys).
+
 ## Content and responsibility
 
 Horu ships no anime, manga, subtitles, audio or lists of sources. It works on what you bring: your own files, your own servers, your own accounts. You are responsible for where your material comes from and for following the terms of the sites and services you use (including streaming services whose subtitles or audio you record) and the copyright law where you live. The manga source extensions are third-party add-ons that you add yourself; Horu does not recommend or include any. Horu is provided as is, without warranty (GPL-3.0).
 
 ## Privacy
 
-- No account, no server of ours, no central site, no analytics. The app is static files that you serve yourself (from your laptop or Pi, or from your own GitHub Pages); your data lives on your phone and your laptop.
+Horu has no account, no server of ours, no central site, no analytics and no telemetry, and the app loads no fonts, scripts or images from third parties. The app is static files that you serve yourself (from your laptop or Pi, or from your own GitHub Pages); your data lives on your phone and your laptop.
+
+**What reaches other services, and only when you use that feature:**
+
+| When | Where it goes | What is sent |
+|---|---|---|
+| Subtitles (Watch, Chrome recording) | jimaku.cc | The show title and episode number, and your Jimaku key. |
+| First start of the laptop (and the phone when it works alone) | github.com, api.github.com, raw.githubusercontent.com | Plain downloads of the dictionary data (JMdict, KANJIDIC) and the JLPT lists. Nothing about you. |
+| Installing optional modules | PyPI, GitHub, Hugging Face, winget | Downloads of Whisper, text recognition, voice, ffmpeg and Suwayomi (installer and first use). |
+| Explanations and *Translate* | The AI you chose in *Settings → AI order*: Claude Code (your own login), Gemini, Anthropic or OpenAI with your key | The sentence, the chosen word, the lines around it and your *About you* text. Ollama stays on your laptop. *Copy prompt* sends nothing: you paste it yourself. |
+| *Listen* with the natural voice | Microsoft (the Edge neural voice) | The sentence. Switch it off under *Natural voice for Listen*: then the voice of the laptop or phone reads. |
+| Reminders | The push service of your phone's maker (Apple, Google) | One notification with its text. |
+| AniList, jpdb, WaniKani (only when connected) | anilist.co, jpdb.io, wanikani.com | Your token, and what you watched or learned for that service. |
+| Manga sources, media servers, article fetch | The sites and servers you add or type in | Normal requests: they see your address. Horu recommends and ships no source. |
+
+**What stays where:**
+
 - The laptop only answers the app, your Tailscale network (through `tailscale serve`) and its own Chrome extension. Everything else needs the access token, also a plain `http://100.x.y.z:7317` address.
-- API keys you saved on the laptop stay there: the app only sees their last four characters. The Jimaku key is the exception, a connected phone gets it so it can load subtitles itself.
+- API keys you saved on the laptop stay there: the app only sees their last four characters. The Jimaku key is the exception, a connected phone gets it so it can load subtitles itself. Keys you type on the phone stay on the phone and never go to the laptop.
 - While you record a tab, the extension sends the words of that page that name the show (tab title, headings, address words; not the site name or the query) to your own laptop, and only there.
-- API keys you enter stay on the device where you enter them (phone keys never go to the laptop). The optional extra backup copy leaves keys out.
-- Calls go only to the services you set up: Jimaku, AnkiConnect, your AI service, AniList, jpdb, WaniKani, your media or manga server.
+- The optional extra backup copy and the phone backup file leave keys out.
 
 ## Your own copy of the app
 
@@ -605,6 +655,7 @@ Development: `npm run dev -w pwa` (app on :5173, proxies the service on :7317), 
 - [open-anki-jlpt-decks](https://github.com/jamsinclair/open-anki-jlpt-decks) (MIT) for the JLPT baseline
 - [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (MIT), [mokuro](https://github.com/kha-white/mokuro) (GPL-3.0), [Suwayomi](https://github.com/Suwayomi/Suwayomi-Server) (MPL 2.0)
 - [sql.js](https://github.com/sql-js/sql.js) (MIT), [fflate](https://github.com/101arrowz/fflate) (MIT), [jsQR](https://github.com/cozmo/jsQR) (Apache 2.0)
+- Demo manga in the screenshots: [Pepper&Carrot](https://www.peppercarrot.com) by David Revoy (CC BY 4.0)
 - Ideas from [Sluka](https://www.sluka.app), [Yomitan](https://github.com/yomidevs/yomitan), asbplayer and mpvacious
 
 ## Licence

@@ -199,7 +199,7 @@ chrome.runtime.onMessage.addListener((msg: Msg, sender, sendResponse) => {
     return true;
   }
   if (msg.type === 'site-subs') {
-    void getState().then((s) => s && sender.tab?.id === s.tabId && sendSiteSubs(msg.cues, msg.live, sender.tab.title));
+    void getState().then((s) => s && sender.tab?.id === s.tabId && isAutoCaptions(s.tabId).then((auto) => sendSiteSubs(msg.cues, msg.live, sender.tab?.title, auto)));
     return false;
   }
   if (msg.type === 'capture-stopped') {
@@ -226,14 +226,36 @@ chrome.runtime.onMessage.addListener((msg: Msg, sender, sendResponse) => {
 
 // ---- the page's own subtitles (see content.ts) ----
 
-async function sendSiteSubs(cues: { start: number; end: number; text: string }[], live: boolean, page?: string): Promise<unknown> {
+async function sendSiteSubs(cues: { start: number; end: number; text: string }[], live: boolean, page?: string, auto = false): Promise<unknown> {
   const server = await loadServer();
   return fetch(`${server.url}/api/sessions/site-subs`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders(server) },
-    body: JSON.stringify({ cues, live, page }),
+    body: JSON.stringify({ cues, live, page, auto }),
   }).catch(() => undefined);
 }
+
+// YouTube's automatic captions (speech recognition) are often wrong and arrive as rolling text. The player asks
+// for them with kind=asr; as long as a tab's last caption request was one, its lines are marked automatic and
+// the laptop leaves them to Whisper instead.
+// (Kept in session storage: the service worker is stopped and restarted all the time.)
+async function autoTabList(): Promise<number[]> {
+  const got = (await chrome.storage.session.get('autoTabs')) as { autoTabs?: number[] };
+  return got.autoTabs ?? [];
+}
+async function markAutoCaptions(tabId: number, on: boolean): Promise<void> {
+  const list = (await autoTabList()).filter((id) => id !== tabId);
+  if (on) list.push(tabId);
+  await chrome.storage.session.set({ autoTabs: list });
+}
+const isAutoCaptions = async (tabId: number) => (await autoTabList()).includes(tabId);
+chrome.webRequest.onBeforeRequest.addListener(
+  (d) => {
+    if (d.tabId >= 0) void markAutoCaptions(d.tabId, /[?&]kind=asr(?:&|$)/.test(d.url));
+  },
+  { urls: ['*://*.youtube.com/api/timedtext*'] },
+);
+chrome.tabs.onRemoved.addListener((id) => void markAutoCaptions(id, false));
 
 // Subtitle files the recorded tab downloads (Crunchyroll's .ass, the .vtt of many web players). Only Japanese
 // ones are passed on: most of their lines contain kana.

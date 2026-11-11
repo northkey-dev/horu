@@ -37,6 +37,11 @@ export async function forget(key: string): Promise<void> {
   await run('readwrite', (s) => s.delete(key)).catch(() => undefined);
 }
 
+/** Every key with its value (for the phone backup). */
+export async function allKeys(): Promise<string[]> {
+  return (await run<IDBValidKey[]>('readonly', (s) => s.getAllKeys()).catch(() => [])).map(String);
+}
+
 void navigator.storage?.persist?.().catch(() => false);
 
 // ---- media of open inbox moments ----

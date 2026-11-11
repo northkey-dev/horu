@@ -237,6 +237,13 @@ try {
     assert.equal(renamed.session.title, "Frieren: Beyond Journey's End");
   });
 
+  await check('automatic captions (YouTube speech recognition) are not taken as lines', async () => {
+    await call('POST', '/api/sessions/end');
+    const res = (await call('POST', '/api/sessions/site-subs', { cues: [{ start: 1, end: 2, text: '自動字幕です' }], live: true, page: 'Auto video', auto: true })).json;
+    assert.equal(res.lines, 0);
+    assert.equal((await call('GET', '/api/status')).json.session, undefined);
+  });
+
   await check('page recognition: the page you moved on to has the last word', async () => {
     await call('POST', '/api/sessions/end');
     const detect = (n) => call('POST', '/api/sessions/detect', { texts: [{ text: `Demon Slayer Episode ${n}`, weight: 2 }] });

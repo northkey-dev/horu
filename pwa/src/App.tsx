@@ -15,6 +15,7 @@ import { Manga } from './screens/Manga.tsx';
 import { Texts } from './screens/Texts.tsx';
 import { Camera } from './screens/Camera.tsx';
 import { Study, partOf } from './screens/Study.tsx';
+import { Welcome, showWelcome } from './components/Welcome.tsx';
 
 // Once per start: the laptop's Anki note type, deck and learner profile, for cards the phone builds itself.
 let learned = false;
@@ -97,6 +98,7 @@ export function App() {
   useEffect(() => setMisses((m) => (error ? m + 1 : 0)), [error]);
   const offline = misses >= 2;
   const paired = hasLaptop();
+  const [welcome, setWelcome] = useState(() => showWelcome() && !hasLaptop() && !/^#\/pair/.test(location.hash));
   const inboxCount = (status?.inboxCount ?? 0) + pendingPhone();
 
   return (
@@ -125,6 +127,7 @@ export function App() {
         {STUDY.has(page) && <Study {...partOf(page, arg)} />}
         {page === 'settings' && <Settings status={status} />}
       </main>
+      {welcome && <Welcome onClose={() => setWelcome(false)} />}
       {toast && <div className="toast top">{toast}</div>}
       <nav className="tabbar">
         <div className="tabbar-inner">

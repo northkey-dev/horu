@@ -217,7 +217,9 @@ export function apiRouter(): express.Router {
   r.post(
     '/sessions/site-subs',
     h((req) => {
-      const { cues, live, page } = req.body as { cues?: Cue[]; live?: boolean; page?: string };
+      const { cues, live, page, auto } = req.body as { cues?: Cue[]; live?: boolean; page?: string; auto?: boolean };
+      // Automatic captions (YouTube speech recognition) are worse than Whisper listening to the audio.
+      if (auto === true) return { lines: 0, ignored: 'auto-generated captions' };
       const clean = (Array.isArray(cues) ? cues : [])
         .filter((c) => Number.isFinite(c?.start) && Number.isFinite(c?.end) && typeof c.text === 'string' && c.text.trim())
         .slice(0, 5000)

@@ -161,6 +161,10 @@ b, strong { font-weight: 600; }
 /* full-width text actions at the end of a list ("Import…", "Remove") */
 .action-row { justify-content: center; font-weight: 600; }
 .action-row.danger { color: var(--accent); }
+a.list-item { text-decoration: none; }
+.credit { padding: 10px 0; }
+.credit b { font-weight: 600; }
+.credit .hint { display: block; margin-top: 2px; }
 
 /* an index card: used for the sentence and for blocks that belong together */
 .card { background: var(--card); border: var(--hair) solid var(--line); border-radius: 6px; padding: 18px; box-shadow: var(--shadow-card); }
@@ -556,6 +560,7 @@ ol.steps li::marker { color: var(--text-2); font-variant-numeric: tabular-nums; 
 .tabs { margin: 14px 0 4px; }
 .section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 32px 0 8px; }
 .section-head h2 { margin: 0; }
+.segmented.tabs button { padding: 0 3px; min-width: 0; font-size: 13px; }
 .segmented.range { display: inline-flex; flex: none; }
 .segmented.range button { flex: none; min-height: 28px; height: 28px; font-size: 12.5px; padding: 0 10px; }
 .source-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; }

@@ -144,6 +144,17 @@ async function autoMatch(id: string): Promise<void> {
         return;
       }
     }
+    // Nothing on offer is even close to what was said: these are not the subtitles of this audio (Netflix has a
+    // freely translated Japanese track next to the closed captions, YouTube has speech recognition). The
+    // heard line goes in as a candidate of its own and is preselected; the subtitle lines stay available.
+    const current = store.getMoment(id);
+    // (Whisper invents "thanks for watching" over silence: never a line to offer.)
+    const heard = segments.filter((s) => s.text.replace(/[^぀-ヿ一-鿿]/g, '').length >= 4 && !/ご視聴|チャンネル登録/.test(s.text)).slice(-2);
+    if (current?.status === 'ready' && heard.length && current.candidates.every((c) => heard.every((h) => recall(c.text, h.text) < 0.25))) {
+      const base = current.audioStart ?? 0;
+      const extra: Candidate[] = heard.map((s) => ({ start: base + s.start, end: base + s.end, text: s.text, source: 'whisper' }));
+      store.updateMoment(id, { candidates: [...current.candidates, ...extra], matchedIndex: current.candidates.length + extra.length - 1 });
+    }
   } catch (err) {
     log.debug('Auto-match failed', err);
   }

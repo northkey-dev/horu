@@ -1,0 +1,51 @@
+name: Bug report
+description: Something does not work as the README says
+labels: [bug]
+body:
+  - type: textarea
+    id: did
+    attributes:
+      label: What did you do?
+      description: Steps, in order. Which screen, which button.
+    validations:
+      required: true
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Settings → About (app) and the top of Settings (laptop).
+    validations:
+      required: true
+  - type: dropdown
+    id: setup
+    attributes:
+      label: Setup
+      multiple: true
+      options:
+        - Phone only
+        - Laptop (Windows)
+        - Laptop (macOS / Linux)
+        - Raspberry Pi / Docker
+        - Chrome extension
+  - type: input
+    id: device
+    attributes:
+      label: Phone and browser
+      placeholder: iPhone 15, iOS 18, home-screen app / Pixel 8, Chrome
+  - type: textarea
+    id: check
+    attributes:
+      label: Output of Settings → Laptop → Check everything
+      description: Contains no keys. Leave empty without a laptop.
+      render: text
+  - type: textarea
+    id: shot
+    attributes:
+      label: Screenshot or log
+      description: Drag a screenshot here. Remove personal data first.

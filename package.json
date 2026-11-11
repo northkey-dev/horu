@@ -2,7 +2,7 @@
   "name": "horu",
   "private": true,
   "license": "GPL-3.0-or-later",
-  "version": "0.22.2",
+  "version": "1.0.0",
   "description": "Mine Japanese sentences from anime and manga without pausing.",
   "workspaces": [
     "server",
