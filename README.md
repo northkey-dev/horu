@@ -16,7 +16,7 @@ Horu is a web app for your phone (it installs to the home screen). It runs on it
 </p>
 <p align="center"><sub>Word sheet · translate a speech bubble · end of a chapter · progress. Demo manga: “Pepper&amp;Carrot” by David Revoy (CC BY 4.0).</sub></p>
 
-**Contents:** [What it does](#what-it-does) · [Two ways to use it](#two-ways-to-use-it) · [Furigana on the cards](#furigana-on-the-cards) · [Manga](#manga) · [Camera](#camera) · [Raspberry Pi / Docker](#raspberry-pi--docker) · [Updating](#updating) · [Settings reference](#settings-reference) · [Troubleshooting](#troubleshooting) · [Privacy](#privacy) · [Your own copy](#your-own-copy-of-the-app)
+**Contents:** [What it does](#what-it-does) · [Two ways to use it](#two-ways-to-use-it) · [Furigana on the cards](#furigana-on-the-cards) · [Manga](#manga) · [Camera](#camera) · [Raspberry Pi / Docker](#raspberry-pi--docker) · [Updating](#updating) · [Settings reference](#settings-reference) · [Known limits](#known-limits) · [Troubleshooting](#troubleshooting) · [Privacy](#privacy) · [Your own copy](#your-own-copy-of-the-app)
 
 ## What it does
 
@@ -534,7 +534,7 @@ Every option in **Settings**. The page has six tabs (the last one you used stays
 | | Pick the line by ear (on) | Whisper listens to every mark and preselects the subtitle line that was actually spoken. |
 | **Backup** | Extra copy to | Optional folder (for example in OneDrive) that gets a copy of the daily backup. It leaves out your Jimaku key, access token and push keys. Horu keeps the last 7 days and one per week for the 4 weeks before in `data/backups` (at most 11 copies, the AI log packed). *Restore* can go back to any of them. |
 | | Back up now / Restore | Writes a backup right away. *Restore* picks a day, replaces your current data with it and restarts Horu; the current state is kept as a safety copy. |
-| **Known words from Anki** | Anki search (empty) | Which reviewed cards count as known. Empty means all decks. Example: `deck:Japanisch*`. |
+| **Known words from Anki** | Anki search (empty) | Which reviewed cards count as known. Empty means all decks. Example: `deck:Japanese*`. |
 | | Count JLPT N5 and N4 as known (on) | Treats the N5 and N4 vocabulary as known, so previews and suggestions skip it. |
 | **Media player** | Player (none) | *Jellyfin*, *Plex*, *Kodi* or *mpv*: the laptop asks it for the playback position, so the phone's episode clock follows it. Switch on *Follow* on the Watch screen. |
 | | Server address / API key / Plex token / user:password | The address of the server and its key. Kodi needs *Allow remote control via HTTP* (Settings → Services → Control). mpv needs `--input-ipc-server=…` (the field shows the pipe name; empty uses the default). |
@@ -579,6 +579,17 @@ The extension has one options page (the server address); otherwise it is control
 | Right-click → *Highlight unknown Japanese words on this site* | The same as `Alt+Shift+J`. |
 | Right-click → *Japanese subtitles over the recorded video* | Shows the subtitles as an overlay on the video, with unknown words underlined. |
 | Hover a word | The dictionary appears; from there you can send the sentence to your inbox. |
+
+## Known limits
+
+Horu is used daily by its author, but not every path has been tested on every device. What to expect:
+
+- **Netflix in the iPhone app:** the app has no picture-in-picture and its screenshots are black, and it tells nothing about what is playing. Horu cannot mark or place a moment there. Use Netflix in Chrome on a laptop with the extension (show, episode, time and audio are then exact), or an app or site that allows picture-in-picture.
+- **The phone's episode clock is a timer you set:** pausing, skipping an intro or seeking in the player moves the video, not the clock. Correct it with −5/+5 s, by typing the time, or by tapping the subtitle line you just heard. With the laptop recording the tab none of this applies.
+- **Back Tap and Shortcuts need a running episode** (started in Horu, or Chrome recording). Without one the laptop answers *Nothing marked* and keeps nothing.
+- **Only the iPhone and Chrome on Windows are tested in daily use.** Android, macOS, Linux and the arm64 Raspberry Pi image are built and checked as far as possible without the devices; please report what you find.
+- **Streaming sites with ads or pop-ups** can stop a video from playing in Safari. A content blocker (AdGuard, Wipr, 1Blocker) fixes that; it is not part of Horu.
+- **Japanese only,** and subtitles from Jimaku exist for anime and some dramas, not everything. Without them Whisper listens (laptop needed), or you add a subtitle file.
 
 ## Troubleshooting
 

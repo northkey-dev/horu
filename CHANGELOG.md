@@ -2,6 +2,10 @@
 
 Release numbers follow `package.json`. The app, the laptop service and the Chrome extension share one number.
 
+## 1.0.1 (2026-11-11)
+
+README: *Known limits* (Netflix on the iPhone, the phone clock, Back Tap needs a running episode, tested devices). Neutral example in the known-words search.
+
 ## 1.0.0 (2026-11-11)
 
 First public release.

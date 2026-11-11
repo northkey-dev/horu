@@ -417,7 +417,7 @@ export function Settings({ status }: { status?: Status }) {
         <>
             <h2>Known words from Anki</h2>
             <div className="group">
-              {field('knownWordsQuery', 'Anki search', 'text', 'Which reviewed cards count as known. Empty means all decks. Example: deck:Japanisch*', true)}
+              {field('knownWordsQuery', 'Anki search', 'text', 'Which reviewed cards count as known. Empty means all decks. Example: deck:Japanese*', true)}
               {toggle('jlptBaseline', 'Count JLPT N5 and N4 as known')}
             </div>
         </>
