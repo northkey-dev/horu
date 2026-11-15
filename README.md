@@ -139,12 +139,13 @@ The quiz takes 8 kanji a round from your marks, JLPT N5, N4 or a school grade (1
 
 The fourth tab, **List**, is for what comes next. Anime or manga is chosen at the top (Horu remembers it). It has three parts:
 
-- **My list:** what you still want to watch (anime) or read (manga), newest first. Add a title with the search at the top (any title: English, romaji or Japanese), or with **+** on any cover in *For you* and *Top*. Titles you already started in Horu or on AniList move to *Already started*, so you can take them off.
+- **My list:** what you still want to watch (anime) or read (manga), newest first. Add a title with the search at the top (any title: English, romaji or Japanese), or with **+** on any cover in *For you* and *Top*. While you type, suggestions appear from the first letters on (*frier* finds Frieren), so a title you only half remember is enough; tap one for its page or **+** to add it. Titles you already started in Horu or on AniList move to *Already started*, so you can take them off.
 - **For you:** recommendations that fit you. Every anime you watched in Horu (more watch time counts more), every manga in your library, every title on your list and, with AniList connected, everything you watched or read there (titles you rated high count most, low ratings and dropped titles not at all) is a starting point. Horu adds up AniList's community recommendations of all of them, prefers well rated titles and your favourite genres, and leaves out what you have seen. Each cover says why (*You watched Mushishi*). Below them: the best rated titles in your two favourite genres that you have not seen.
 - **Top:** AniList's best rated titles of all time (only titles with enough votes), what is trending now, or what is airing or coming out now; with a genre filter. Japanese titles only (no Korean or Chinese comics), no light novels or music videos. Titles you have seen are faded.
 
-Tap a cover for the story, the genres and what to do:
+Tap a cover for the story, the genres, who made it (the **mangaka** of a manga, the original creator of an anime, with the Japanese name) and what to do:
 - **Put on my list** or take it off.
+- **Already watched** / **Already read:** marks the title as seen. It leaves your list and the recommendations and counts as something you like for *For you*; with AniList connected it is set to *Completed* there. All of them are under the small *Seen (n)* link at the bottom of *My list* and *For you*; *Undo* there takes the mark back (and deletes the AniList entry Horu made, unless you rated the title there).
 - **Watch in Horu** opens *Watch* with the anime chosen on Jimaku (or searched by its title). **Find in your sources** opens the manga search with the Japanese title (needs the laptop).
 - **Not interested:** the title leaves the recommendations for good. All of them are listed under the small *Not interested (n)* link at the bottom of *My list* and *For you*; *Undo* there lets a title be recommended again.
 - For an anime, **Japanese in Horu** says whether Jimaku has Japanese subtitles and, with the laptop reachable, how many of the words in episode 1 you already know: 90% and more is comfortable, around 80% a good stretch, below that hard for now.
@@ -659,7 +660,7 @@ Horu has no account, no server of ours, no central site, no analytics and no tel
 | Explanations and *Translate* | The AI you chose in *Settings → AI order*: Claude Code (your own login), Gemini, Anthropic or OpenAI with your key | The sentence, the chosen word, the lines around it and your *About you* text. Ollama stays on your laptop. *Copy prompt* sends nothing: you paste it yourself. |
 | *Listen* with the natural voice | Microsoft (the Edge neural voice) | The sentence. Switch it off under *Natural voice for Listen*: then the voice of the laptop or phone reads. |
 | Reminders | The push service of your phone's maker (Apple, Google) | One notification with its text. |
-| The List tab | graphql.anilist.co, s4.anilist.co (cover pictures) | Search words, and the AniList ids or titles of what you watched, read or listed (for recommendations). No account and no token unless you connected AniList. |
+| The List tab | graphql.anilist.co, s4.anilist.co (cover pictures), kitsu.app (suggestions while you type) | Search words, and the AniList ids or titles of what you watched, read or listed (for recommendations). No account and no token unless you connected AniList. |
 | AniList, jpdb, WaniKani (only when connected) | anilist.co, jpdb.io, wanikani.com | Your token, and what you watched or learned for that service. |
 | Manga sources, media servers, article fetch | The sites and servers you add or type in | Normal requests: they see your address. Horu recommends and ships no source. |
 

@@ -108,9 +108,18 @@ export function toMedia(m: RawMedia): Media {
 
 type Page = { Page: { media: RawMedia[]; pageInfo?: { hasNextPage: boolean } } };
 
-export async function searchMedia(q: string, type: MediaKind): Promise<Media[]> {
-  const r = await gql<Page>('', `query ($q: String, $t: MediaType) { Page(perPage: 15) { media(search: $q, type: $t, isAdult: false, sort: SEARCH_MATCH) { ${FIELDS} } } }`, { q, t: type });
+/** Titles matching `q` in any of their names (English, romaji, Japanese, other names), best match first. */
+export async function searchMedia(q: string, type: MediaKind, count = 15): Promise<Media[]> {
+  const r = await gql<Page>('', `query ($q: String, $t: MediaType, $n: Int) { Page(perPage: $n) { media(search: $q, type: $t, isAdult: false, sort: SEARCH_MATCH) { ${FIELDS} } } }`, { q, t: type, n: count });
   return r.Page.media.map(toMedia);
+}
+
+/** These titles, in this order (unknown or adult ones left out). Up to 25 in one call. */
+export async function mediaByIds(ids: number[]): Promise<Media[]> {
+  if (!ids.length) return [];
+  const r = await gql<Page>('', `query ($ids: [Int]) { Page(perPage: 25) { media(id_in: $ids, isAdult: false) { ${FIELDS} } } }`, { ids: ids.slice(0, 25) });
+  const byId = new Map(r.Page.media.map((m) => [m.id, toMedia(m)]));
+  return ids.map((id) => byId.get(id)).filter((m): m is Media => Boolean(m));
 }
 
 export type Chart = 'top' | 'trending' | 'now';
@@ -162,10 +171,35 @@ export async function matchTitles(titles: string[], type: MediaKind): Promise<(M
   });
 }
 
-export type MediaDetail = Media & { description?: string; url?: string };
+/** Who made it: the mangaka (story, art) or the original creator, with the Japanese name when AniList has it. */
+export type Creator = { name: string; native?: string; roles: string[] };
+export type MediaDetail = Media & { description?: string; url?: string; creators: Creator[] };
+
+const CREATOR_ROLES = new Set(['Story & Art', 'Story', 'Art', 'Original Creator', 'Original Story']);
+
+type StaffEdge = { role: string | null; node: { name: { full: string | null; native: string | null } } | null };
+
+/** The people behind a title from its staff list; assistants, translators and editors stay out. */
+export function creatorsOf(edges: StaffEdge[]): Creator[] {
+  const byName = new Map<string, Creator>();
+  for (const e of edges) {
+    const role = (e.role ?? '').replace(/\s*\(.*\)\s*$/, '').trim();
+    const name = e.node?.name.full?.trim();
+    if (!name || !CREATOR_ROLES.has(role)) continue;
+    const had = byName.get(name) ?? { name, native: e.node?.name.native?.trim() || undefined, roles: [] };
+    if (!had.roles.includes(role)) had.roles.push(role);
+    byName.set(name, had);
+  }
+  return [...byName.values()].slice(0, 4);
+}
 
 export async function mediaDetail(id: number): Promise<MediaDetail> {
-  const r = await gql<{ Media: RawMedia & { description: string | null; siteUrl: string | null } }>('', `query ($id: Int) { Media(id: $id) { ${FIELDS} description(asHtml: false) siteUrl } }`, { id });
+  type R = RawMedia & { description: string | null; siteUrl: string | null; staff: { edges: StaffEdge[] } | null };
+  const r = await gql<{ Media: R }>(
+    '',
+    `query ($id: Int) { Media(id: $id) { ${FIELDS} description(asHtml: false) siteUrl staff(sort: [RELEVANCE, ROLE], perPage: 12) { edges { role node { name { full native } } } } } }`,
+    { id },
+  );
   const description = r.Media.description
     ?.replace(/<br\s*\/?>/gi, '\n')
     .replace(/<[^>]+>/g, '')
@@ -174,7 +208,7 @@ export async function mediaDetail(id: number): Promise<MediaDetail> {
     .replace(/&amp;/g, '&')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
-  return { ...toMedia(r.Media), description: description || undefined, url: r.Media.siteUrl ?? undefined };
+  return { ...toMedia(r.Media), description: description || undefined, url: r.Media.siteUrl ?? undefined, creators: creatorsOf(r.Media.staff?.edges ?? []) };
 }
 
 let viewer: { token: string; id: number } | undefined;
@@ -195,9 +229,9 @@ export async function listEntries(token: string): Promise<ListEntry[]> {
   return [...out.values()];
 }
 
-/** Puts a title on the AniList list as Planning; returns the list entry id. */
-export async function savePlanning(token: string, mediaId: number): Promise<number> {
-  const r = await gql<{ SaveMediaListEntry: { id: number } }>(token, 'mutation ($id: Int) { SaveMediaListEntry(mediaId: $id, status: PLANNING) { id } }', { id: mediaId });
+/** Puts a title on the AniList list as Planning (or Completed, for one marked seen); returns the list entry id. */
+export async function saveStatus(token: string, mediaId: number, status: 'PLANNING' | 'COMPLETED'): Promise<number> {
+  const r = await gql<{ SaveMediaListEntry: { id: number } }>(token, 'mutation ($id: Int, $s: MediaListStatus) { SaveMediaListEntry(mediaId: $id, status: $s) { id } }', { id: mediaId, s: status });
   return r.SaveMediaListEntry.id;
 }
 

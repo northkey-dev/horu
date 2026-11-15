@@ -343,7 +343,7 @@ try {
   });
 
   await check('list tab: the laptop copy merges, history lists what was watched', async () => {
-    assert.deepEqual((await call('GET', '/api/watchlist')).json, { items: {}, dismissed: {} });
+    assert.deepEqual((await call('GET', '/api/watchlist')).json, { items: {}, dismissed: {}, seen: {} });
     const item = { id: 5, type: 'ANIME', title: 'Five', genres: ['Drama'], addedAt: '2026-11-01T10:00:00.000Z', at: '2026-11-01T10:00:00.000Z' };
     await call('PUT', '/api/watchlist', { items: { 5: item, 6: { id: 6, type: 'BOOK', title: 'x' } }, dismissed: { 7: { media: { id: 7, type: 'MANGA', title: 'Seven', genres: [] }, at: '2026-11-01T10:00:00.000Z' }, 8: { at: '2026-11-01T10:00:00.000Z' } } });
     const a = (await call('GET', '/api/watchlist')).json;
@@ -351,6 +351,8 @@ try {
     assert.deepEqual(Object.keys(a.dismissed), ['7'], 'a no without its title is dropped');
     await call('PUT', '/api/watchlist', { items: {}, dismissed: { 7: { ...a.dismissed['7'], at: '2026-11-03T10:00:00.000Z', off: true } } });
     assert.equal((await call('GET', '/api/watchlist')).json.dismissed['7'].off, true, 'changing your mind travels to the laptop');
+    await call('PUT', '/api/watchlist', { items: {}, seen: { 9: { media: { id: 9, type: 'ANIME', title: 'Nine', genres: [] }, at: '2026-11-03T10:00:00.000Z', entryId: 90 } } });
+    assert.equal((await call('GET', '/api/watchlist')).json.seen['9'].entryId, 90, 'seen marks are kept with their AniList entry');
     await call('PUT', '/api/watchlist', { items: { 5: { ...item, removed: true, at: '2026-11-02T10:00:00.000Z' } }, dismissed: {} });
     assert.equal((await call('GET', '/api/watchlist')).json.items['5'].removed, true, 'a later removal wins');
     await call('PUT', '/api/watchlist', { items: { 5: item }, dismissed: {} });

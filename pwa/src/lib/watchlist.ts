@@ -4,9 +4,11 @@ import { recall, remember } from './mirror.ts';
 import { anilistToken, phoneJimaku, phoneJimakuKey, recentPhoneSessions } from './phone.ts';
 import {
   addItem,
-  dismiss as dismissIn,
-  isDismissed,
-  undismiss,
+  isMarked,
+  mark,
+  markedItems,
+  reconcileSeen,
+  unmark,
   emptyList,
   liveItems,
   mergeLists,
@@ -17,9 +19,10 @@ import {
   type MediaKind,
   type Watchlist,
 } from '../../../shared/watchlist.ts';
-import { NOT_SHOWN, chartMedia, deleteListEntry, listEntries, matchTitles, mediaDetail, recommendationsFor, savePlanning, searchMedia, type Chart, type MediaDetail } from '../../../shared/anilist.ts';
+import { NOT_SHOWN, chartMedia, deleteListEntry, listEntries, matchTitles, mediaByIds, mediaDetail, recommendationsFor, saveStatus, searchMedia, type Chart, type MediaDetail } from '../../../shared/anilist.ts';
 import { entryWeight, genreProfile, mergeSeeds, rankRecommendations, topGenres, watchedWeight, type RecEdge, type Recommendation, type Seed } from '../../../shared/recommend.ts';
 import type { JimakuEntry } from '../../../shared/types.ts';
+import { kitsuAnilistIds } from '../../../shared/kitsu.ts';
 
 // The List tab on the phone: the list itself (kept here, a copy on the laptop, and the AniList Planning list when
 // AniList is connected), the top charts and the recommendations. AniList is asked straight from the phone;
@@ -46,8 +49,11 @@ async function change(fn: (l: Watchlist) => Watchlist): Promise<Watchlist> {
 
 export const addToList = (m: Media) => change((l) => addItem(l, m, now()));
 export const removeFromList = (id: number) => change((l) => removeItem(l, id, now()));
-export const notInterested = (m: Media) => change((l) => dismissIn(l, m, now()));
-export const undoNotInterested = (id: number) => change((l) => undismiss(l, id, now()));
+export const notInterested = (m: Media) => change((l) => mark(l, 'dismissed', m, now()));
+export const undoNotInterested = (id: number) => change((l) => unmark(l, 'dismissed', id, now()));
+/** Already watched or read: off the list, out of the recommendations, a seed for them, Completed on AniList. */
+export const markSeen = (m: Media) => change((l) => mark(l, 'seen', m, now()));
+export const unmarkSeen = (id: number) => change((l) => unmark(l, 'seen', id, now()));
 
 // ---- sync: laptop copy and AniList Planning ----
 
@@ -87,10 +93,17 @@ async function syncOnce(): Promise<void> {
       const r = reconcile(list, remote, now());
       list = r.list;
       for (const id of r.save) {
-        const entryId = await savePlanning(token, id);
+        const entryId = await saveStatus(token, id, 'PLANNING');
         list = { ...list, items: { ...list.items, [id]: { ...list.items[id], entryId } } };
       }
       for (const entryId of r.remove) await deleteListEntry(token, entryId);
+      // Seen here → Completed there (after the Planning entry above is gone); a mark taken back → that entry deleted.
+      const s = reconcileSeen(list, remote);
+      for (const entryId of s.drop) await deleteListEntry(token, entryId);
+      for (const id of s.complete) {
+        const entryId = await saveStatus(token, id, 'COMPLETED');
+        list = removeItem({ ...list, seen: { ...list.seen, [id]: { ...list.seen[id], entryId } } }, id, now());
+      }
     } catch (e) {
       error = (e as Error).message;
     }
@@ -119,10 +132,37 @@ async function cached<T>(key: string, maxAge: number, load: () => Promise<T>, fr
   }
 }
 
-export const search = (q: string, type: MediaKind) => searchMedia(q, type);
+/**
+ * Titles for what was typed, also from its first letters: Kitsu finds "frier" → Frieren (shared/kitsu.ts), AniList
+ * fills up when Kitsu has few or does not answer. No light novels among manga.
+ */
+async function findTitles(q: string, type: MediaKind, count: number): Promise<Media[]> {
+  const ids = await kitsuAnilistIds(q, type, count).catch(() => [] as number[]);
+  let out = ids.length ? await mediaByIds(ids).catch(() => [] as Media[]) : [];
+  if (out.length < Math.min(4, count)) {
+    const more = await searchMedia(q, type, count);
+    out = [...out, ...more.filter((m) => !out.some((x) => x.id === m.id))];
+  }
+  return out.filter((m) => !NOT_SHOWN[type].includes(m.format ?? '')).slice(0, count);
+}
+
+export const search = (q: string, type: MediaKind) => findTitles(q, type, 15);
+
+// Suggestions while typing: the same query is not asked twice in one visit.
+const suggested = new Map<string, Promise<Media[]>>();
+export function suggest(q: string, type: MediaKind): Promise<Media[]> {
+  const key = `${type}:${q.toLowerCase()}`;
+  let hit = suggested.get(key);
+  if (!hit) {
+    hit = findTitles(q, type, 8);
+    hit.catch(() => suggested.delete(key));
+    suggested.set(key, hit);
+  }
+  return hit;
+}
 export const chart = (c: Chart, type: MediaKind, page: number, genre: string, fresh = false) =>
   cached(`al:chart:${c}:${type}:${genre}:${page}`, 12 * HOUR, () => chartMedia(c, type, page, genre || undefined), fresh);
-export const detail = (id: number): Promise<MediaDetail> => cached(`al:media:${id}`, 7 * 24 * HOUR, () => mediaDetail(id));
+export const detail = (id: number): Promise<MediaDetail> => cached(`al:media2:${id}`, 7 * 24 * HOUR, () => mediaDetail(id));
 
 /** Your AniList lists (empty without AniList). */
 async function anilistLists(fresh: boolean): Promise<ListEntry[]> {
@@ -163,8 +203,11 @@ async function resolveIds(titles: string[], type: MediaKind): Promise<Record<str
 
 /** Ids of everything you watched or read: in Horu, and on AniList (except Planning). */
 export async function startedIds(): Promise<Set<number>> {
-  const [h, lists] = await Promise.all([horuHistory(), anilistLists(false)]);
-  const ids = new Set<number>(lists.filter((e) => e.status !== 'PLANNING').map((e) => e.media.id));
+  const [h, lists, list] = await Promise.all([horuHistory(), anilistLists(false), loadList()]);
+  // An entry Horu made for a seen mark that was taken back is about to be deleted: not seen.
+  const takenBack = new Set(Object.values(list.seen ?? {}).filter((m) => m.off && m.entryId).map((m) => m.entryId));
+  const ids = new Set<number>(lists.filter((e) => e.status !== 'PLANNING' && !takenBack.has(e.entryId)).map((e) => e.media.id));
+  markedItems(list, 'seen').forEach((m) => ids.add(m.media.id));
   h.anime.forEach((a) => a.anilistId && ids.add(a.anilistId));
   const known = (await recall<Record<string, number>>('al-ids'))?.value ?? {};
   for (const a of h.anime) if (known[`ANIME:${a.title}`]) ids.add(known[`ANIME:${a.title}`]);
@@ -235,9 +278,10 @@ export async function forYou(type: MediaKind, fresh = false): Promise<ForYou> {
   }
   for (const m of history.manga) if (mangaIds[m.title]) seeds.push({ id: mangaIds[m.title], title: m.title, weight: 1, why: 'read' });
   for (const it of liveItems(list)) seeds.push({ id: it.id, title: it.title, weight: 0.5, why: 'listed' });
+  for (const { media } of markedItems(list, 'seen')) seeds.push({ id: media.id, title: media.title, weight: 1, why: media.type === 'ANIME' ? 'watched' : 'read' });
   const top = mergeSeeds(seeds);
 
-  const exclude = new Set<number>([...lists.map((e) => e.media.id), ...seeds.map((s) => s.id), ...Object.keys(list.dismissed).map(Number).filter((id) => isDismissed(list, id))]);
+  const exclude = new Set<number>([...lists.map((e) => e.media.id), ...seeds.map((s) => s.id), ...markedItems(list, 'dismissed').map((d) => d.media.id), ...markedItems(list, 'seen').map((d) => d.media.id)]);
   if (!top.length) return { picks: [], seeds: [], genres: [], inGenres: [] };
 
   const recs = await recsFor(

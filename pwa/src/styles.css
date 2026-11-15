@@ -816,3 +816,8 @@ button.ghost.on { color: var(--accent); font-weight: 600; }
 .media-genres .tag { margin-left: 0; }
 .media-desc { white-space: pre-line; font-size: 14.5px; line-height: 21px; margin: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; cursor: pointer; }
 .media-desc.open { display: block; cursor: default; }
+.cover.sm { width: 34px; height: 48px; border-radius: 2px; font-size: 12px; }
+.suggest { margin-top: 8px; }
+.suggest .media-open { padding: 7px 0; min-height: 0; align-items: center; gap: 12px; }
+.suggest .media-open .grow { gap: 0; }
+.media-creators { margin-top: 4px; }

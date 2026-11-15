@@ -36,16 +36,22 @@ export type WatchItem = Media & {
   entryId?: number;
 };
 
-/** A title you said "Not interested" to. `off`: you changed your mind (kept so another copy does not bring it back). */
-export type Dismissed = { media: Media; at: string; off?: boolean };
+/**
+ * A title you marked: "Not interested" (`dismissed`) or "Seen / read" (`seen`). `off`: you took the mark back (kept so
+ * another copy does not bring it back). `entryId`: the AniList entry Horu made for a seen title (set to Completed).
+ */
+export type Marked = { media: Media; at: string; off?: boolean; entryId?: number };
+export type MarkKind = 'dismissed' | 'seen';
 
 export type Watchlist = {
   items: Record<string, WatchItem>;
   /** Recommendations you said no to, by id */
-  dismissed: Record<string, Dismissed>;
+  dismissed: Record<string, Marked>;
+  /** Titles you marked as already watched or read, by id */
+  seen: Record<string, Marked>;
 };
 
-export const emptyList = (): Watchlist => ({ items: {}, dismissed: {} });
+export const emptyList = (): Watchlist => ({ items: {}, dismissed: {}, seen: {} });
 
 /** What is on the list, newest first. */
 export const liveItems = (list: Watchlist): WatchItem[] =>
@@ -67,22 +73,37 @@ export function removeItem(list: Watchlist, id: number, now: string): Watchlist 
   return { ...list, items: { ...list.items, [id]: { ...had, removed: true, at: now } } };
 }
 
-export const isDismissed = (list: Watchlist, id: number): boolean => Boolean(list.dismissed[id] && !list.dismissed[id].off);
+const marks = (list: Watchlist, kind: MarkKind): Record<string, Marked> => list[kind] ?? {};
 
-/** The "Not interested" list, the latest first. */
-export const dismissedItems = (list: Watchlist): Dismissed[] =>
-  Object.values(list.dismissed)
+export const isMarked = (list: Watchlist, kind: MarkKind, id: number): boolean => Boolean(marks(list, kind)[id] && !marks(list, kind)[id].off);
+
+/** The marked titles, the latest first. */
+export const markedItems = (list: Watchlist, kind: MarkKind): Marked[] =>
+  Object.values(marks(list, kind))
     .filter((d) => !d.off)
     .sort((a, b) => b.at.localeCompare(a.at));
 
-export function dismiss(list: Watchlist, media: Media, now: string): Watchlist {
-  return { ...list, dismissed: { ...list.dismissed, [media.id]: { media, at: now } } };
+/** Marks a title. Seen takes it off the list too: there is nothing left to watch. */
+export function mark(list: Watchlist, kind: MarkKind, media: Media, now: string): Watchlist {
+  // A new mark starts without an AniList entry: one Horu made earlier may be gone since.
+  const next = { ...list, [kind]: { ...marks(list, kind), [media.id]: { media, at: now } } };
+  return kind === 'seen' ? removeItem(next, media.id, now) : next;
 }
 
-export function undismiss(list: Watchlist, id: number, now: string): Watchlist {
-  const had = list.dismissed[id];
+export function unmark(list: Watchlist, kind: MarkKind, id: number, now: string): Watchlist {
+  const had = marks(list, kind)[id];
   if (!had || had.off) return list;
-  return { ...list, dismissed: { ...list.dismissed, [id]: { ...had, at: now, off: true } } };
+  return { ...list, [kind]: { ...marks(list, kind), [id]: { ...had, at: now, off: true } } };
+}
+
+function mergeMarks(a: Record<string, Marked> = {}, b: Record<string, Marked> = {}): Record<string, Marked> {
+  const out = { ...a };
+  for (const [k, theirs] of Object.entries(b)) {
+    const mine = out[k];
+    if (!mine || theirs.at > mine.at) out[k] = theirs;
+    else if (theirs.at === mine.at && mine.entryId === undefined && theirs.entryId !== undefined) out[k] = { ...mine, entryId: theirs.entryId };
+  }
+  return out;
 }
 
 export function mergeLists(a: Watchlist, b: Watchlist): Watchlist {
@@ -92,9 +113,7 @@ export function mergeLists(a: Watchlist, b: Watchlist): Watchlist {
     if (!mine || theirs.at > mine.at) items[k] = theirs;
     else if (theirs.at === mine.at && mine.entryId === undefined && theirs.entryId !== undefined) items[k] = { ...mine, entryId: theirs.entryId };
   }
-  const dismissed = { ...a.dismissed };
-  for (const [k, theirs] of Object.entries(b.dismissed)) if (!dismissed[k] || theirs.at > dismissed[k].at) dismissed[k] = theirs;
-  return { items, dismissed };
+  return { items, dismissed: mergeMarks(a.dismissed, b.dismissed), seen: mergeMarks(a.seen, b.seen) };
 }
 
 // ---- checking what comes from outside (the laptop takes the list from any paired device) ----
@@ -132,7 +151,7 @@ export function cleanMedia(x: unknown): Media | undefined {
 export function cleanList(input: unknown): Watchlist {
   const out = emptyList();
   if (!input || typeof input !== 'object') return out;
-  const { items, dismissed } = input as { items?: unknown; dismissed?: unknown };
+  const { items } = input as { items?: unknown };
   if (items && typeof items === 'object') {
     for (const raw of Object.values(items as Record<string, Record<string, unknown>>).slice(0, 5000)) {
       const media = cleanMedia(raw);
@@ -140,12 +159,15 @@ export function cleanList(input: unknown): Watchlist {
       out.items[media.id] = { ...media, addedAt: String(raw.addedAt), at: String(raw.at), removed: raw.removed === true || undefined, entryId: int(raw.entryId) };
     }
   }
-  if (dismissed && typeof dismissed === 'object')
-    for (const raw of Object.values(dismissed as Record<string, Record<string, unknown>>).slice(0, 5000)) {
-      const media = cleanMedia(raw?.media);
-      if (!media || !ISO.test(String(raw.at))) continue;
-      out.dismissed[media.id] = { media, at: String(raw.at), off: raw.off === true || undefined };
+  for (const kind of ['dismissed', 'seen'] as const) {
+    const raw = (input as Record<string, unknown>)[kind];
+    if (!raw || typeof raw !== 'object') continue;
+    for (const m of Object.values(raw as Record<string, Record<string, unknown>>).slice(0, 5000)) {
+      const media = cleanMedia(m?.media);
+      if (!media || !ISO.test(String(m.at))) continue;
+      out[kind][media.id] = { media, at: String(m.at), off: m.off === true || undefined, entryId: int(m.entryId) };
     }
+  }
   return out;
 }
 
@@ -188,4 +210,22 @@ export function reconcile(list: Watchlist, remote: ListEntry[], now: string): { 
     } else if (e.status !== 'PLANNING' && iso(e.updatedAt) > it.at) items[it.id] = { ...it, removed: true, at: now, entryId: undefined };
   }
   return { list: { ...list, items }, save, remove };
+}
+
+/**
+ * Seen titles and AniList: a title marked seen here that AniList does not have (or only plans) is to be set to
+ * Completed there (`complete`, media ids). Taking the mark back deletes the entry Horu made, but only while it is
+ * still the plain Completed entry without a score of yours (`drop`, list entry ids).
+ */
+export function reconcileSeen(list: Watchlist, remote: ListEntry[]): { complete: number[]; drop: number[] } {
+  const byId = new Map(remote.map((e) => [e.media.id, e]));
+  const complete: number[] = [];
+  const drop: number[] = [];
+  for (const m of Object.values(list.seen ?? {})) {
+    const e = byId.get(m.media.id);
+    if (!m.off) {
+      if (!m.entryId && (!e || e.status === 'PLANNING')) complete.push(m.media.id);
+    } else if (m.entryId && e && e.entryId === m.entryId && e.status === 'COMPLETED' && !e.score) drop.push(m.entryId);
+  }
+  return { complete, drop };
 }

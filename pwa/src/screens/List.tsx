@@ -10,19 +10,22 @@ import {
   detail,
   forYou,
   loadList,
+  markSeen,
   notInterested,
   readHref,
   removeFromList,
   search,
   startedIds,
   subtitlesFor,
+  suggest,
   syncList,
   syncState,
   undoNotInterested,
+  unmarkSeen,
   watchHref,
   type ForYou,
 } from '../lib/watchlist.ts';
-import { dismissedItems, isDismissed, liveItems, onList, type Media, type MediaKind, type Watchlist } from '../../../shared/watchlist.ts';
+import { isMarked, liveItems, markedItems, onList, type MarkKind, type Media, type MediaKind, type Watchlist } from '../../../shared/watchlist.ts';
 import type { Chart, MediaDetail } from '../../../shared/anilist.ts';
 import type { Recommendation, SeedWhy } from '../../../shared/recommend.ts';
 import type { JimakuEntry } from '../../../shared/types.ts';
@@ -94,7 +97,8 @@ const WHY: Record<SeedWhy, string> = { watched: 'You watched', read: 'You read',
 const reason = (because?: Recommendation['because']) => (because?.length ? `${WHY[because[0].why]} ${because[0].title}` : undefined);
 
 export function List({ route }: { route: string[] }) {
-  if (route[0] === 'hidden') return <NotInterested />;
+  if (route[0] === 'hidden') return <MarkedPage kind="dismissed" />;
+  if (route[0] === 'seen') return <MarkedPage kind="seen" />;
   return <Lists route={route} />;
 }
 
@@ -151,9 +155,9 @@ type Ctx = { type: MediaKind; list?: Watchlist; started: Set<number>; show: (m: 
 
 // ---------------------------------------------------------------- pieces
 
-function Cover({ m, big }: { m: Media; big?: boolean }) {
+function Cover({ m, big, small }: { m: Media; big?: boolean; small?: boolean }) {
   const [failed, setFailed] = useState(false);
-  const cls = `cover${big ? ' lg' : ''}`;
+  const cls = `cover${big ? ' lg' : small ? ' sm' : ''}`;
   return m.cover && !failed ? (
     <img className={cls} src={m.cover} alt="" loading="lazy" referrerPolicy="no-referrer" style={{ background: m.color }} onError={() => setFailed(true)} />
   ) : (
@@ -231,6 +235,20 @@ function Mine(ctx: Ctx) {
   }, []);
   useEffect(() => setResults(undefined), [type]);
 
+  // Suggestions while typing, for a title you only half remember. A short pause first, and only the answer to what
+  // is typed now is shown.
+  const [hints, setHints] = useState<Media[]>();
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2 || results) return setHints(undefined);
+    let stale = false;
+    const timer = setTimeout(() => void suggest(q, type).then((r) => !stale && setHints(r), () => undefined), 400);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+  }, [query, type, results]);
+
   async function find(e: React.FormEvent) {
     e.preventDefault();
     if (!query.trim()) return;
@@ -256,12 +274,42 @@ function Mine(ctx: Ctx) {
       <form className="search-row" style={{ marginTop: 18 }} onSubmit={find}>
         <div className="search">
           <Icon name="search" size={17} weight={2} />
-          <input type="search" enterKeyHint="search" placeholder={`Add ${type === 'ANIME' ? 'an anime' : 'a manga'}: any title`} value={query} onChange={(e) => setQuery(e.target.value)} />
+          <input
+            type="search"
+            enterKeyHint="search"
+            autoComplete="off"
+            placeholder={`Add ${type === 'ANIME' ? 'an anime' : 'a manga'}: any title`}
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setResults(undefined);
+            }}
+            onKeyDown={(e) => e.key === 'Escape' && setHints(undefined)}
+          />
         </div>
         <button className="ghost" disabled={!query.trim() || busy}>
           {busy ? <span className="spinner" /> : 'Search'}
         </button>
       </form>
+      {hints && !results && (
+        <div className="group suggest" role="listbox" aria-label="Suggestions">
+          {hints.map((m) => (
+            <div key={m.id} className="media-row" role="option" aria-selected={false}>
+              <button className="list-item media-open" onClick={() => ctx.show(m)}>
+                <Cover m={m} small />
+                <span className="grow">
+                  <span className="ellipsis">{m.title}</span>
+                  <span className="sub ellipsis">
+                    {[m.romaji && m.romaji !== m.title ? m.romaji : m.native, m.year, m.format && FORMATS[m.format], started.has(m.id) && 'Seen'].filter(Boolean).join(' · ')}
+                  </span>
+                </span>
+              </button>
+              <AddButton m={m} list={ctx.list} />
+            </div>
+          ))}
+          {!hints.length && <div className="cell muted small">No match yet. Keep typing, or try the romaji or Japanese title.</div>}
+        </div>
+      )}
       {error && <div className="banner error" style={{ marginTop: 12 }}>{error}</div>}
       {results && (
         <>
@@ -313,7 +361,7 @@ function Mine(ctx: Ctx) {
           </button>
         )}
       </p>
-      <HiddenLink list={list} />
+      <MarkLinks list={list} />
     </>
   );
 }
@@ -346,7 +394,7 @@ function ForYouView(ctx: Ctx) {
 
   const value = data?.type === type ? data.value : undefined;
   // Taken onto the list or said no to since the picks were made: out of the way at once.
-  const fresh = (id: number) => !list || (!onList(list, id) && !isDismissed(list, id));
+  const fresh = (id: number) => !list || (!onList(list, id) && !isMarked(list, 'dismissed', id) && !isMarked(list, 'seen', id));
   const picks = value?.picks.filter((p) => fresh(p.media.id)) ?? [];
   const inGenres = value?.inGenres.filter((m) => fresh(m.id)) ?? [];
   const shown = all ? picks : picks.slice(0, 18);
@@ -404,7 +452,7 @@ function ForYouView(ctx: Ctx) {
           </button>
         </p>
       )}
-      <HiddenLink list={list} />
+      <MarkLinks list={list} />
     </>
   );
 }
@@ -486,29 +534,54 @@ function Top(ctx: Ctx) {
   );
 }
 
-// ---------------------------------------------------------------- not interested
+// ---------------------------------------------------------------- seen and not interested
 
-/** The quiet way in to the titles you said no to: a footnote link, only when there are some. */
-function HiddenLink({ list }: { list?: Watchlist }) {
-  const count = list ? dismissedItems(list).length : 0;
-  if (!count) return null;
+const MARKED: Record<MarkKind, { title: string; text: string; undo: (id: number) => Promise<unknown> }> = {
+  seen: {
+    title: 'Seen',
+    text: 'Titles you marked as already watched or read. They count for your recommendations and stay out of them; with AniList connected they are Completed there. Marked one by mistake? Tap Undo.',
+    undo: unmarkSeen,
+  },
+  dismissed: {
+    title: 'Not interested',
+    text: 'Titles you said no to stay out of the recommendations. Changed your mind? Tap Undo and the title can be recommended again.',
+    undo: undoNotInterested,
+  },
+};
+
+/** The quiet way in to the titles you marked: footnote links, only when there are some. */
+function MarkLinks({ list }: { list?: Watchlist }) {
+  const links = (['seen', 'dismissed'] as const).map((k) => ({ k, n: list ? markedItems(list, k).length : 0 })).filter((l) => l.n);
+  if (!links.length) return null;
   return (
     <p className="footnote" style={{ marginTop: 14 }}>
-      <a href="#/list/hidden">Not interested ({count})</a>
+      {links.map((l, i) => (
+        <span key={l.k}>
+          {i > 0 && ' · '}
+          <a href={`#/list/${l.k === 'seen' ? 'seen' : 'hidden'}`}>
+            {MARKED[l.k].title} ({l.n})
+          </a>
+        </span>
+      ))}
     </p>
   );
 }
 
-function NotInterested() {
+function MarkedPage({ kind }: { kind: MarkKind }) {
   const list = useWatchlist();
   useEffect(() => void syncList(), []);
-  const items = list ? dismissedItems(list) : [];
+  const items = list ? markedItems(list, kind) : [];
+  const info = MARKED[kind];
   return (
     <div>
       <Nav back="List" />
-      <h1>Not interested</h1>
-      <p className="footnote">Titles you said no to stay out of the recommendations. Changed your mind? Tap <i>Undo</i> and the title can be recommended again.</p>
-      {list && !items.length && <p className="footnote" style={{ marginTop: 18 }}>Nothing here.</p>}
+      <h1>{info.title}</h1>
+      <p className="footnote">{info.text}</p>
+      {list && !items.length && (
+        <p className="footnote" style={{ marginTop: 18 }}>
+          Nothing here.
+        </p>
+      )}
       {!!items.length && (
         <div className="group" style={{ marginTop: 18 }}>
           {items.map(({ media: m, at }) => (
@@ -518,13 +591,11 @@ function NotInterested() {
                 <span className="grow">
                   <span className="media-title">{m.title}</span>
                   {m.native && m.native !== m.title && <span className="sub jp ellipsis">{m.native}</span>}
-                  <span className="sub">
-                    {[m.type === 'ANIME' ? 'Anime' : m.format === 'MANGA' ? '' : 'Manga', metaLine(m)].filter(Boolean).join(' · ')}
-                  </span>
+                  <span className="sub">{[m.type === 'ANIME' ? 'Anime' : m.format === 'MANGA' ? '' : 'Manga', metaLine(m)].filter(Boolean).join(' · ')}</span>
                   <span className="sub">Since {new Date(at).toLocaleDateString()}</span>
                 </span>
               </div>
-              <button className="small" onClick={() => void undoNotInterested(m.id)}>
+              <button className="small" onClick={() => void info.undo(m.id)}>
                 Undo
               </button>
             </div>
@@ -544,7 +615,9 @@ function MediaSheet({ media, because, list, started, onClose }: { media: Media; 
   const [coverage, setCoverage] = useState<number>();
   const m = info ?? media;
   const on = onList(list, media.id);
-  const dismissed = isDismissed(list, media.id);
+  const dismissed = isMarked(list, 'dismissed', media.id);
+  const seen = isMarked(list, 'seen', media.id);
+  const anime = media.type === 'ANIME';
 
   useEffect(() => {
     void detail(media.id).then(setInfo, () => undefined);
@@ -570,7 +643,17 @@ function MediaSheet({ media, because, list, started, onClose }: { media: Media; 
             <div className="sub" style={{ marginTop: 4 }}>
               {metaLine(m)}
             </div>
-            {started && <div className="sub">You watched or read this already.</div>}
+            {!!info?.creators.length && (
+              <div className="media-creators">
+                {info.creators.map((c) => (
+                  <div key={c.name} className="sub">
+                    {!anime && c.roles.includes('Story & Art') ? 'Mangaka' : c.roles.join(' & ')}: {c.native && <span className="jp">{c.native} </span>}
+                    {c.native ? `(${c.name})` : c.name}
+                  </div>
+                ))}
+              </div>
+            )}
+            {started && !seen && <div className="sub">You watched or read this already (in Horu or on AniList).</div>}
           </div>
         </div>
         {because?.length ? <p className="footnote">Because: {because.map((b) => `${WHY[b.why].replace(':', '')} ${b.title}`).join('; ')}.</p> : null}
@@ -588,7 +671,7 @@ function MediaSheet({ media, because, list, started, onClose }: { media: Media; 
           {on ? 'On your list · take it off' : media.type === 'ANIME' ? 'Put on my list to watch' : 'Put on my list to read'}
         </button>
         <div className="row" style={{ marginTop: 10 }}>
-          {media.type === 'ANIME' ? (
+          {anime ? (
             <a className="btn grow" href={watchHref(media, subs === 'checking' || subs === 'failed' ? undefined : subs)} onClick={onClose}>
               Watch in Horu
             </a>
@@ -599,12 +682,16 @@ function MediaSheet({ media, because, list, started, onClose }: { media: Media; 
               </a>
             )
           )}
-          {!on && (
-            <button className="grow" onClick={() => void (dismissed ? undoNotInterested(media.id) : notInterested(media).then(onClose))}>
-              {dismissed ? 'Interested again' : 'Not interested'}
-            </button>
-          )}
+          <button className={`grow${seen ? ' known-on' : ''}`} aria-pressed={seen} onClick={() => void (seen ? unmarkSeen(media.id) : markSeen(media))}>
+            {seen && <Icon name="check" size={16} weight={2.2} />}
+            {seen ? (anime ? 'Watched' : 'Read') : anime ? 'Already watched' : 'Already read'}
+          </button>
         </div>
+        {!on && !seen && (
+          <button className="ghost small" style={{ marginTop: 8 }} onClick={() => void (dismissed ? undoNotInterested(media.id) : notInterested(media).then(onClose))}>
+            {dismissed ? 'Interested again' : 'Not interested'}
+          </button>
+        )}
 
         {media.type === 'ANIME' && (
           <>

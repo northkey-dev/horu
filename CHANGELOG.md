@@ -2,6 +2,13 @@
 
 Release numbers follow `package.json`. The app, the laptop service and the Chrome extension share one number.
 
+## 1.2.0 (2026-11-15)
+
+List tab:
+- **Suggestions while typing** in the search: from the first letters on (*frier* → Frieren, *yotsu* → Yotsuba&!), through Kitsu, mapped to AniList titles; AniList fills up. The *Search* button finds partial titles the same way. No light novels among manga.
+- **Mangaka** in the title sheet (story and art, with the Japanese name), the original creator for anime; assistants and translators left out.
+- **Already watched / Already read:** marks a title as seen: off the list and out of the recommendations, a seed for *For you*, *Completed* on AniList when connected. **Seen** list with *Undo* (deletes the AniList entry Horu made, unless you rated it there).
+
 ## 1.1.1 (2026-11-15)
 
 List tab: **Not interested** list (small link at the bottom of *My list* and *For you*) with every title you said no to; *Undo* lets it be recommended again, also on the laptop copy and other devices.

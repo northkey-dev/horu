@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addItem, cleanList, dismiss, dismissedItems, emptyList, isDismissed, liveItems, mergeLists, reconcile, removeItem, undismiss } from '../../shared/watchlist.ts';
+import { addItem, cleanList, emptyList, isMarked, liveItems, mark, markedItems, mergeLists, onList, reconcile, reconcileSeen, removeItem, unmark } from '../../shared/watchlist.ts';
+import { creatorsOf } from '../../shared/anilist.ts';
+
+const dismiss = (l, m, at) => mark(l, 'dismissed', m, at);
+const undismiss = (l, id, at) => unmark(l, 'dismissed', id, at);
+const isDismissed = (l, id) => isMarked(l, 'dismissed', id);
+const dismissedItems = (l) => markedItems(l, 'dismissed');
 import { entryWeight, genreProfile, mergeSeeds, rankRecommendations, topGenres, watchedWeight } from '../../shared/recommend.ts';
 
 const media = (id, extra = {}) => ({ id, type: 'ANIME', title: `T${id}`, genres: [], ...extra });
@@ -58,6 +64,53 @@ test('not interested: listed with its title, undo survives a merge with an older
   assert.equal(dismissedItems(changed).length, 0);
   assert.equal(isDismissed(mergeLists(said, changed), 4), false, 'the older "no" from the laptop does not come back');
   assert.equal(isDismissed(mergeLists(changed, dismiss(changed, media(4), T3)), 4), true, 'saying no again later counts');
+});
+
+test('seen: takes the title off the list, survives merges, can be taken back', () => {
+  let l = addItem(emptyList(), media(7), T1);
+  l = mark(l, 'seen', media(7), T2);
+  assert.equal(onList(l, 7), false, 'nothing left to watch');
+  assert.equal(isMarked(l, 'seen', 7), true);
+  const back = unmark(l, 'seen', 7, T3);
+  assert.equal(isMarked(back, 'seen', 7), false);
+  assert.equal(isMarked(mergeLists(l, back), 'seen', 7), false, 'the older mark does not come back');
+  assert.equal(isMarked(cleanList(JSON.parse(JSON.stringify(l))), 'seen', 7), true, 'the laptop keeps it');
+  assert.equal(isMarked(cleanList({ items: {}, dismissed: {} }), 'seen', 7), false, 'an old copy without seen marks is fine');
+});
+
+test('seen and AniList: Completed there unless AniList has it already; taking it back deletes only our plain entry', () => {
+  let l = mark(emptyList(), 'seen', media(1), T1); // AniList does not know it
+  l = mark(l, 'seen', media(2), T1); // planned there
+  l = mark(l, 'seen', media(3), T1); // already completed there
+  const remote = [
+    { entryId: 20, status: 'PLANNING', updatedAt: sec(T1), score: 0, progress: 0, media: media(2) },
+    { entryId: 30, status: 'COMPLETED', updatedAt: sec(T1), score: 80, progress: 12, media: media(3) },
+  ];
+  assert.deepEqual(reconcileSeen(l, remote), { complete: [1, 2], drop: [] });
+
+  let ours = mark(emptyList(), 'seen', media(4), T1);
+  ours = { ...ours, seen: { 4: { ...ours.seen[4], entryId: 40 } } };
+  ours = unmark(ours, 'seen', 4, T2);
+  const plain = [{ entryId: 40, status: 'COMPLETED', updatedAt: sec(T1), score: 0, progress: 0, media: media(4) }];
+  assert.deepEqual(reconcileSeen(ours, plain).drop, [40]);
+  const rated = [{ ...plain[0], score: 70 }];
+  assert.deepEqual(reconcileSeen(ours, rated).drop, [], 'a score you gave there stays');
+  assert.equal(mark(ours, 'seen', media(4), T3).seen[4].entryId, undefined, 'marking again asks AniList again');
+});
+
+test('creators: the mangaka, not assistants or translators', () => {
+  const edge = (role, full, native = null) => ({ role, node: { name: { full, native } } });
+  const c = creatorsOf([
+    edge('Story & Art', 'Eiichirou Oda', '尾田栄一郎'),
+    edge('Assistant (Former)', 'Someone', '誰か'),
+    edge('Translator (English)', 'Amy'),
+    edge('Story', 'Writer A', 'A'),
+    edge('Art (Chapters 1-10)', 'Writer A', 'A'),
+  ]);
+  assert.deepEqual(c, [
+    { name: 'Eiichirou Oda', native: '尾田栄一郎', roles: ['Story & Art'] },
+    { name: 'Writer A', native: 'A', roles: ['Story', 'Art'] },
+  ]);
 });
 
 test('AniList: Planning joins the list, new titles are saved, removed ones deleted', () => {
