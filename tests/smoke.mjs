@@ -342,6 +342,24 @@ try {
     assert.equal((await call('GET', '/api/kanji/skill')).json['日'].box, 2, 'an older copy does not overwrite');
   });
 
+  await check('list tab: the laptop copy merges, history lists what was watched', async () => {
+    assert.deepEqual((await call('GET', '/api/watchlist')).json, { items: {}, dismissed: {} });
+    const item = { id: 5, type: 'ANIME', title: 'Five', genres: ['Drama'], addedAt: '2026-11-01T10:00:00.000Z', at: '2026-11-01T10:00:00.000Z' };
+    await call('PUT', '/api/watchlist', { items: { 5: item, 6: { id: 6, type: 'BOOK', title: 'x' } }, dismissed: { 7: { media: { id: 7, type: 'MANGA', title: 'Seven', genres: [] }, at: '2026-11-01T10:00:00.000Z' }, 8: { at: '2026-11-01T10:00:00.000Z' } } });
+    const a = (await call('GET', '/api/watchlist')).json;
+    assert.deepEqual(Object.keys(a.items), ['5'], 'only well-formed titles get in');
+    assert.deepEqual(Object.keys(a.dismissed), ['7'], 'a no without its title is dropped');
+    await call('PUT', '/api/watchlist', { items: {}, dismissed: { 7: { ...a.dismissed['7'], at: '2026-11-03T10:00:00.000Z', off: true } } });
+    assert.equal((await call('GET', '/api/watchlist')).json.dismissed['7'].off, true, 'changing your mind travels to the laptop');
+    await call('PUT', '/api/watchlist', { items: { 5: { ...item, removed: true, at: '2026-11-02T10:00:00.000Z' } }, dismissed: {} });
+    assert.equal((await call('GET', '/api/watchlist')).json.items['5'].removed, true, 'a later removal wins');
+    await call('PUT', '/api/watchlist', { items: { 5: item }, dismissed: {} });
+    assert.equal((await call('GET', '/api/watchlist')).json.items['5'].removed, true, 'an older copy does not bring it back');
+    const h = (await call('GET', '/api/watchlist/history')).json;
+    assert.ok(Array.isArray(h.anime) && Array.isArray(h.manga));
+    assert.ok(h.anime.length >= 1, 'the episodes watched above are in the history');
+  });
+
   await check('share: Japanese sentences of a shared text reach the inbox', async () => {
     const before = (await call('GET', '/api/inbox')).json.length;
     const res = await fetch(base + '/api/text/share', { method: 'POST', headers: { 'Content-Type': 'text/plain; charset=utf-8' }, body: '今日は雨だ。でも行く！\nEnglish only' });

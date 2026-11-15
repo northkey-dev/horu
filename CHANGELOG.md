@@ -2,6 +2,20 @@
 
 Release numbers follow `package.json`. The app, the laptop service and the Chrome extension share one number.
 
+## 1.1.1 (2026-11-15)
+
+List tab: **Not interested** list (small link at the bottom of *My list* and *For you*) with every title you said no to; *Undo* lets it be recommended again, also on the laptop copy and other devices.
+
+## 1.1.0 (2026-11-15)
+
+**List tab** (new, between Read and Study): what you still want to watch or read, and what to pick next.
+
+- **My list:** anime and manga to watch or read, added by search or with + on any cover. Titles started in Horu or on AniList move to *Already started*.
+- **AniList sync both ways:** connected, the list is your AniList Planning list (added here → Planning there, planned there → here, taken off here → deleted there; started or finished on AniList → off the list). Without AniList it is kept on the phone and copied to the laptop (`data/watchlist.json`, daily backup and phone backup).
+- **For you:** recommendations from AniList's community recommendations of everything you watched in Horu (weighted by watch time), your manga library, your list and your AniList ratings, tilted to well rated titles and your favourite genres, with the reason on each cover; *Not interested* removes a title for good. Below: the best rated titles in your two favourite genres.
+- **Top:** best rated of all time, trending, airing/publishing now, with a genre filter. Japanese titles only, no light novels.
+- **Title sheet:** story, genres, *Watch in Horu* (opens Watch with the Jimaku entry chosen), *Find in your sources* (manga search with the Japanese title), whether Jimaku has Japanese subtitles and how many words of episode 1 you already know.
+
 ## 1.0.3 (2026-11-11)
 
 Support link: Ko-fi (README badge, repository sponsor button, Settings → About) and a *Support* section in the README.

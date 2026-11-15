@@ -14,6 +14,7 @@ import { Settings } from './screens/Settings.tsx';
 import { Manga } from './screens/Manga.tsx';
 import { Texts } from './screens/Texts.tsx';
 import { Camera } from './screens/Camera.tsx';
+import { List } from './screens/List.tsx';
 import { Study, partOf } from './screens/Study.tsx';
 import { Welcome, showWelcome } from './components/Welcome.tsx';
 
@@ -27,6 +28,7 @@ const TABS = [
   { path: 'watch', label: 'Watch', icon: 'watch' },
   { path: 'inbox', label: 'Inbox', icon: 'inbox' },
   { path: 'manga', label: 'Read', icon: 'book' },
+  { path: 'list', label: 'List', icon: 'bookmark' },
   { path: 'study', label: 'Study', icon: 'card' },
   { path: 'settings', label: 'Settings', icon: 'settings' },
 ];
@@ -117,13 +119,14 @@ export function App() {
           </div>
         )}
         {status?.aiNote && page !== 'manga' && page !== 'texts' && page !== 'camera' && <div className="banner info">{status.aiNote}</div>}
-        {page === 'watch' && <Watch status={status} refreshStatus={refresh} />}
+        {page === 'watch' && <Watch status={status} refreshStatus={refresh} prefill={route.slice(1)} />}
         {page === 'inbox' && !arg && <Inbox />}
         {page === 'history' && <History />}
         {page === 'inbox' && arg && <InboxItem id={arg} />}
         {page === 'manga' && <Manga route={route.slice(1)} online={!offline} />}
         {page === 'texts' && <Texts id={arg} />}
         {page === 'camera' && <Camera />}
+        {page === 'list' && <List route={route.slice(1)} />}
         {STUDY.has(page) && <Study {...partOf(page, arg)} />}
         {page === 'settings' && <Settings status={status} />}
       </main>

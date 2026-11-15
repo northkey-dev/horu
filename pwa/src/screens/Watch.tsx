@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.ts';
-import { formatTime, useEventTick, usePoll, useWakeLock } from '../lib/hooks.ts';
+import { formatTime, navigate, useEventTick, usePoll, useWakeLock } from '../lib/hooks.ts';
 import { micActive, startMic, stopMic } from '../lib/mic.ts';
 import {
   MIC_SECONDS,
@@ -33,12 +33,12 @@ import { Nav } from '../components/Nav.tsx';
 import { WordPrep } from '../components/WordPrep.tsx';
 import type { Cue, JimakuEntry, JimakuFile, Session as SessionInfo, Status } from '../../../shared/types.ts';
 
-export function Watch({ status, refreshStatus }: { status?: Status; refreshStatus: () => void }) {
+export function Watch({ status, refreshStatus, prefill }: { status?: Status; refreshStatus: () => void; prefill?: string[] }) {
   useEventTick('horu-phone');
   const phone = currentSession();
   if (phone) return <PhoneWatch session={phone} player={status?.player} />;
   if (status?.session) return <Session status={status} refreshStatus={refreshStatus} />;
-  return <StartEpisode status={status} onStarted={refreshStatus} />;
+  return <StartEpisode status={status} onStarted={refreshStatus} prefill={prefill} />;
 }
 
 /** The big button, shared by laptop and phone episodes. */
@@ -518,7 +518,7 @@ function mergeRecent(laptop: Recent[] = [], phone: Recent[] = []): Recent[] {
   return [...byKey.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-function StartEpisode({ status, onStarted }: { status?: Status; onStarted: () => void }) {
+function StartEpisode({ status, onStarted, prefill = [] }: { status?: Status; onStarted: () => void; prefill?: string[] }) {
   const recent = usePoll(() => api.recentSessions(), 60_000);
   const chrome = useChromeRecording(onStarted);
   const [chosen, setChosen] = useState<'laptop' | 'phone'>();
@@ -542,12 +542,15 @@ function StartEpisode({ status, onStarted }: { status?: Status; onStarted: () =>
     mode === 'phone' && ownKey ? { search: phoneJimaku.searchEntries, files: phoneJimaku.listFiles } : { search: api.searchJimaku, files: api.jimakuFiles };
   const history = mergeRecent(recent.data, recentPhoneSessions());
 
-  async function search() {
+  async function search(q = query, anilistId?: number) {
     setError(undefined);
     setEntry(undefined);
     setSearching(true);
     try {
-      setResults(await jimaku.search(query));
+      const found = await jimaku.search(q);
+      setResults(found);
+      const match = anilistId && found.find((r) => r.anilist_id === anilistId);
+      if (match) choose(match);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -618,6 +621,20 @@ function StartEpisode({ status, onStarted }: { status?: Status; onStarted: () =>
       setBusy(false);
     }
   }
+
+  // From the List tab: #/watch/jimaku/<entry>/<anilist id>/<name> (subtitles known) or #/watch/find/<anilist id>/<title>
+  const [how, a, b, c] = prefill;
+  useEffect(() => {
+    if (how === 'jimaku' && a) choose({ id: Number(a), name: decodeURIComponent(c ?? ''), anilist_id: Number(b) || undefined });
+    else if (how === 'find' && b) {
+      const q = decodeURIComponent(b);
+      setQuery(q);
+      setManualTitle(q);
+      if (jimakuReady) void search(q, Number(a) || undefined);
+    } else return;
+    navigate('watch');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [how, a, b, c]);
 
   const title = (e: JimakuEntry) => e.english_name || e.name;
 
@@ -762,7 +779,7 @@ function StartEpisode({ status, onStarted }: { status?: Status; onStarted: () =>
                 className="search-row"
                 onSubmit={(e) => {
                   e.preventDefault();
-                  void search();
+                  void search(query);
                 }}
               >
                 <div className="search">

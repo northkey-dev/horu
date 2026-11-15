@@ -25,7 +25,7 @@ If Horu helps your studying, a ⭐ star above helps other learners find it. Than
 </p>
 <p align="center"><sub>Word sheet · translate a speech bubble · end of a chapter · progress. Demo manga: “Pepper&amp;Carrot” by David Revoy (CC BY 4.0).</sub></p>
 
-**Contents:** [What it does](#what-it-does) · [Two ways to use it](#two-ways-to-use-it) · [Furigana on the cards](#furigana-on-the-cards) · [Manga](#manga) · [Camera](#camera) · [Raspberry Pi / Docker](#raspberry-pi--docker) · [Updating](#updating) · [Settings reference](#settings-reference) · [Known limits](#known-limits) · [Troubleshooting](#troubleshooting) · [Privacy](#privacy) · [Your own copy](#your-own-copy-of-the-app)
+**Contents:** [What it does](#what-it-does) · [Two ways to use it](#two-ways-to-use-it) · [The List tab](#the-list-tab) · [Furigana on the cards](#furigana-on-the-cards) · [Manga](#manga) · [Camera](#camera) · [Raspberry Pi / Docker](#raspberry-pi--docker) · [Updating](#updating) · [Settings reference](#settings-reference) · [Known limits](#known-limits) · [Troubleshooting](#troubleshooting) · [Privacy](#privacy) · [Your own copy](#your-own-copy-of-the-app)
 
 ## What it does
 
@@ -56,6 +56,9 @@ If Horu helps your studying, a ⭐ star above helps other learners find it. Than
 - Before an episode or chapter: how much of it you'll understand and the key new words.
 - Yomitan dictionaries (Jitendex, frequency lists, pitch accent) next to JMdict.
 - Progress page with XP, streaks, Anki retention, watch and reading time. AniList episodes ticked off automatically.
+
+**What to watch or read next**
+- The **List** tab: anime and manga you still want to watch or read, the same list as your AniList *Planning* list when AniList is connected. Recommendations that fit what you watched, read and rated, the best rated titles overall, and for an anime whether Jimaku has Japanese subtitles and how many of its words you already know. See [The List tab](#the-list-tab).
 
 ## Two ways to use it
 
@@ -116,7 +119,7 @@ Phone and laptop sync whenever both are reachable; marks made on the phone alone
 
 ## The Study tab
 
-The fourth tab, **Study**, has three parts at the top: **Practice** (what you do), **Kanji** (what you collect) and **Progress** (how you are doing).
+The fifth tab, **Study**, has three parts at the top: **Practice** (what you do), **Kanji** (what you collect) and **Progress** (how you are doing).
 
 **Progress** (the former Insights) shows your streak, daily goal, level, a calendar, last week next to the week before (XP, days studied, new words, reviews and cards), the Anki history and what you mined.
 
@@ -131,6 +134,24 @@ The fourth tab, **Study**, has three parts at the top: **Practice** (what you do
 - **Outlined tile:** it appeared in something you marked or read, but has no stamp yet. Faint tile: not met yet.
 - Tap a tile for its meaning, its on'yomi and kun'yomi (okurigana in brackets, *ひ(く)*) and its box.
 The quiz takes 8 kanji a round from your marks, JLPT N5, N4 or a school grade (1 to 6). The quiz progress is kept on the phone and copied to the laptop (`data/kanji-skill.json`, part of the backup).
+
+## The List tab
+
+The fourth tab, **List**, is for what comes next. Anime or manga is chosen at the top (Horu remembers it). It has three parts:
+
+- **My list:** what you still want to watch (anime) or read (manga), newest first. Add a title with the search at the top (any title: English, romaji or Japanese), or with **+** on any cover in *For you* and *Top*. Titles you already started in Horu or on AniList move to *Already started*, so you can take them off.
+- **For you:** recommendations that fit you. Every anime you watched in Horu (more watch time counts more), every manga in your library, every title on your list and, with AniList connected, everything you watched or read there (titles you rated high count most, low ratings and dropped titles not at all) is a starting point. Horu adds up AniList's community recommendations of all of them, prefers well rated titles and your favourite genres, and leaves out what you have seen. Each cover says why (*You watched Mushishi*). Below them: the best rated titles in your two favourite genres that you have not seen.
+- **Top:** AniList's best rated titles of all time (only titles with enough votes), what is trending now, or what is airing or coming out now; with a genre filter. Japanese titles only (no Korean or Chinese comics), no light novels or music videos. Titles you have seen are faded.
+
+Tap a cover for the story, the genres and what to do:
+- **Put on my list** or take it off.
+- **Watch in Horu** opens *Watch* with the anime chosen on Jimaku (or searched by its title). **Find in your sources** opens the manga search with the Japanese title (needs the laptop).
+- **Not interested:** the title leaves the recommendations for good. All of them are listed under the small *Not interested (n)* link at the bottom of *My list* and *For you*; *Undo* there lets a title be recommended again.
+- For an anime, **Japanese in Horu** says whether Jimaku has Japanese subtitles and, with the laptop reachable, how many of the words in episode 1 you already know: 90% and more is comfortable, around 80% a good stretch, below that hard for now.
+
+**AniList:** connected (Settings → Services → AniList), the list *is* your AniList Planning list, both ways: what you add here is set to Planning there, what you plan on AniList appears here, what you take off here is deleted there. A title you start or finish on AniList leaves the list by itself. Without AniList, the list is kept on the phone and copied to the laptop (`data/watchlist.json`, part of the backup and of the phone backup), so the laptop's own browser and a second phone see the same list.
+
+Covers, scores and recommendations come straight from AniList (no key needed) and are kept on the phone for a while, so the tab opens at once and shows the last answers offline. Which titles you watched is sent to AniList only as plain title look-ups and ids, without any account, unless you connected AniList.
 
 ## The inbox
 
@@ -507,7 +528,7 @@ Every option in **Settings**. The page has six tabs (the last one you used stays
 |---|---|---|
 | **Known words** | Import from | Adds words you already know: *WaniKani* (read-only API token, vocabulary at Guru and above), *jpdb.io* (API key, words jpdb considers known) or a *word list* (one word per line, or a CSV/TSV with the word in the first column, e.g. from Anki, Migaku, Language Reactor). The count of known words on this phone is shown. While the laptop runs, Anki stays the main source. |
 | **Dictionaries** | Add a Yomitan dictionary (.zip) | Shows definitions, frequency or pitch accent under JMdict when you tap a word. Good ones: Jitendex (definitions), JPDB or Innocent Corpus (frequency), Kanjium (pitch accent). Big dictionaries belong on the laptop; without it they go into the phone. *Remove* deletes one. |
-| **AniList** | Client ID / Log in / token | Ticks off watched episodes in your AniList (about two thirds of an episode must have played). Create your own client ID at AniList's developer settings, or paste a token. MyAnimeList users can sync AniList to MAL with a tool such as MAL-Sync. |
+| **AniList** | Client ID / Log in / token | Ticks off watched episodes in your AniList (about two thirds of an episode must have played), and makes the [List tab](#the-list-tab) the same list as your AniList Planning list. Create your own client ID at AniList's developer settings, or paste a token. MyAnimeList users can sync AniList to MAL with a tool such as MAL-Sync. |
 | **Import sentences** | Choose a file | Brings saved items from Language Reactor, asbplayer or Migaku exports, or any list with a sentence column, into the inbox like mined lines. |
 
 ### Status
@@ -626,7 +647,7 @@ Horu ships no anime, manga, subtitles, audio or lists of sources. It works on wh
 
 ## Privacy
 
-Horu has no account, no server of ours, no central site, no analytics and no telemetry, and the app loads no fonts, scripts or images from third parties. The app is static files that you serve yourself (from your laptop or Pi, or from your own GitHub Pages); your data lives on your phone and your laptop.
+Horu has no account, no server of ours, no central site, no analytics and no telemetry, and the app loads no fonts, scripts or images from third parties (the one exception: the cover pictures in the List tab come from AniList). The app is static files that you serve yourself (from your laptop or Pi, or from your own GitHub Pages); your data lives on your phone and your laptop.
 
 **What reaches other services, and only when you use that feature:**
 
@@ -638,6 +659,7 @@ Horu has no account, no server of ours, no central site, no analytics and no tel
 | Explanations and *Translate* | The AI you chose in *Settings → AI order*: Claude Code (your own login), Gemini, Anthropic or OpenAI with your key | The sentence, the chosen word, the lines around it and your *About you* text. Ollama stays on your laptop. *Copy prompt* sends nothing: you paste it yourself. |
 | *Listen* with the natural voice | Microsoft (the Edge neural voice) | The sentence. Switch it off under *Natural voice for Listen*: then the voice of the laptop or phone reads. |
 | Reminders | The push service of your phone's maker (Apple, Google) | One notification with its text. |
+| The List tab | graphql.anilist.co, s4.anilist.co (cover pictures) | Search words, and the AniList ids or titles of what you watched, read or listed (for recommendations). No account and no token unless you connected AniList. |
 | AniList, jpdb, WaniKani (only when connected) | anilist.co, jpdb.io, wanikani.com | Your token, and what you watched or learned for that service. |
 | Manga sources, media servers, article fetch | The sites and servers you add or type in | Normal requests: they see your address. Horu recommends and ships no source. |
 

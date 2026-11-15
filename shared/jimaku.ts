@@ -20,6 +20,18 @@ export function jimakuClient(getKey: () => string, base = BASE) {
   return {
     searchEntries: (query: string) => api<JimakuEntry[]>(`/entries/search?anime=true&query=${encodeURIComponent(query)}`),
 
+    /** The Jimaku entry of an AniList title: asked by its id, else found by one of its titles. */
+    async byAnilist(anilistId: number, titles: string[]): Promise<JimakuEntry | null> {
+      const hit = (list: JimakuEntry[]) => list.find((e) => e.anilist_id === anilistId);
+      const direct = hit(await api<JimakuEntry[]>(`/entries/search?anime=true&anilist_id=${anilistId}`).catch(() => []));
+      if (direct) return direct;
+      for (const t of titles.filter(Boolean).slice(0, 2)) {
+        const found = hit(await api<JimakuEntry[]>(`/entries/search?anime=true&query=${encodeURIComponent(t)}`));
+        if (found) return found;
+      }
+      return null;
+    },
+
     async listFiles(entryId: number, episode: number): Promise<JimakuFile[]> {
       const files = await api<JimakuFile[]>(`/entries/${entryId}/files?episode=${episode}`);
       // Plain subtitle files first, archives last; SRT before ASS (cleaner text).

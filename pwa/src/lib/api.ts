@@ -2,6 +2,7 @@ import type { CardRequest, JimakuEntry, JimakuFile, Moment, Session, Settings, S
 import type { WordState, WordStatus } from '../../../shared/words.ts';
 import type { TranslateInput, Translation } from '../../../shared/ai.ts';
 import type { DictHit, DictInfo } from '../../../shared/yomitan.ts';
+import type { Watchlist } from '../../../shared/watchlist.ts';
 import { laptopBase, laptopUrl } from './laptop.ts';
 import { mirrorMedia, recall, remember } from './mirror.ts';
 import { dropLocal, isLocalMoment, markLocalDone, isPhoneSession, localMediaUrl, localMoments, sessionCues, syncPhone } from './phone.ts';
@@ -195,6 +196,12 @@ export const api = {
   saveSettings: (s: Partial<Settings>) => request('PUT', '/api/settings', s),
 
   searchJimaku: (q: string) => request<JimakuEntry[]>('GET', `/api/jimaku/search?q=${encodeURIComponent(q)}`),
+  jimakuByAnilist: (id: number, title: string, alt = '') =>
+    request<JimakuEntry | null>('GET', `/api/jimaku/anilist/${id}?title=${encodeURIComponent(title)}&alt=${encodeURIComponent(alt)}`, undefined, {}, 45_000),
+  /** The List tab's copy on the laptop (shared/watchlist.ts) */
+  watchlist: () => request<Watchlist>('GET', '/api/watchlist'),
+  putWatchlist: (list: Watchlist) => request<Watchlist>('PUT', '/api/watchlist', list),
+  watchHistory: () => mirrored('watch-history', () => request<WatchHistory>('GET', '/api/watchlist/history')),
   jimakuFiles: (id: number, episode: number) => request<JimakuFile[]>('GET', `/api/jimaku/entries/${id}/files?episode=${episode}`),
   recentSessions: () => mirrored('sessions', () => request<(Session & { nextEpisode: number })[]>('GET', '/api/sessions/recent')),
   startSession: (body: { title: string; jimakuEntryId?: number; anilistId?: number; episode: number; fileUrl?: string; fileName?: string }) =>
@@ -322,3 +329,5 @@ export const api = {
 
 export type WordStat = { word: string; reading: string; count: number; known: boolean; meaning?: string; example?: string; inAnki?: boolean };
 export type EpisodeInsight = { coverage: number; tokens: number; uniqueWords: number; unknownWords: number; priming: WordStat[] };
+
+export type WatchHistory = { anime: { title: string; anilistId?: number; seconds: number; at: string }[]; manga: { title: string; at: string }[] };

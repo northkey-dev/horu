@@ -28,6 +28,7 @@ const PATHS: Record<string, string> = {
   copy: 'M9 9h10v11H9z M15 9V4H5v11h4',
   share: 'M12 15V4 M8 8l4-4 4 4 M6 11v8a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-8',
   phone: 'M8 3h8a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z M11 18h2',
+  bookmark: 'M7 3.5h10a1 1 0 0 1 1 1V20l-6-4-6 4V4.5a1 1 0 0 1 1-1Z',
 };
 
 export function Icon({ name, size = 20, weight = 1.7, className }: { name: keyof typeof PATHS | string; size?: number; weight?: number; className?: string }) {

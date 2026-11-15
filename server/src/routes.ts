@@ -24,7 +24,8 @@ import { kanjiInfo, KANJI_GZ } from './kanji.ts';
 import { DICT_GZ, dictMeta, dictState, ensureDictionary, lookupIndex } from './dict.ts';
 import { toHiragana, tokenizer } from './japanese.ts';
 import { extensionState } from './extensionHub.ts';
-import { cuesFromUpload, listFiles, searchEntries } from './jimaku.ts';
+import { byAnilist, cuesFromUpload, listFiles, searchEntries } from './jimaku.ts';
+import { getWatchlist, mergeIntoWatchlist, watchHistory } from './watchlist.ts';
 import { detectFromPage, startSessionFor, type StartBody } from './sessions.ts';
 import { setRecording } from './remoteStart.ts';
 import { listen, listenOn, speak, ttsInstalled, ttsOn } from './tts.ts';
@@ -178,9 +179,19 @@ export function apiRouter(): express.Router {
     }),
   );
 
+  // ---- the List tab ----
+
+  r.get('/watchlist', h(() => getWatchlist()));
+  r.put('/watchlist', h((req) => mergeIntoWatchlist(req.body)));
+  r.get('/watchlist/history', h(() => watchHistory()));
+
   // ---- jimaku & sessions ----
 
   r.get('/jimaku/search', h((req) => searchEntries(String(req.query.q ?? ''))));
+  r.get(
+    '/jimaku/anilist/:id',
+    h((req) => byAnilist(Number(param(req, 'id')), [String(req.query.title ?? ''), String(req.query.alt ?? '')].map((t) => t.slice(0, 200)))),
+  );
   r.get('/jimaku/entries/:id/files', h((req) => listFiles(Number(param(req, 'id')), Number(req.query.episode))));
 
   r.get(

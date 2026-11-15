@@ -45,7 +45,7 @@ function ChapterState({ status, offline, idle, rereading }: { status?: string; o
 export function Manga({ route, online }: { route: string[]; online: boolean }) {
   const [view, arg] = route;
   if (view === 'read' && arg) return <Reader chapterKey={arg} />;
-  if (view === 'browse') return <Browse />;
+  if (view === 'browse') return <Browse initial={arg ? decodeURIComponent(arg) : ''} />;
   if (view === 'server') return <ServerBrowse />;
   if (view === 'remote' && arg) return <RemoteDetail id={Number(arg)} />;
   if (view === 'm' && arg) return <LocalDetail mangaKey={arg} online={online} />;
@@ -676,10 +676,11 @@ function ServerBrowse() {
   );
 }
 
-function Browse() {
+/** `initial`: a title to look for at once (from the List tab) */
+function Browse({ initial }: { initial: string }) {
   const [sources, setSources] = useState<Source[]>();
   const [source, setSource] = useState<string>(() => localStorage.getItem('horu-source') ?? '');
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initial);
   const [results, setResults] = useState<{ id: number; title: string; inLibrary: boolean }[]>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
@@ -707,6 +708,15 @@ function Browse() {
       // ignore
     }
   }, [source]);
+
+  // The title from the List tab is looked up as soon as a source is there.
+  const asked = useRef(false);
+  useEffect(() => {
+    if (!initial || asked.current || !sources?.length || !source) return;
+    asked.current = true;
+    void search();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sources, source]);
 
   async function search(e?: React.FormEvent) {
     e?.preventDefault();

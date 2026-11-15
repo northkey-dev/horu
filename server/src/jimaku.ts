@@ -5,5 +5,5 @@ import { jimakuClient } from '../../shared/jimaku.ts';
 
 const client = jimakuClient(() => getSettings().jimakuApiKey, process.env.HORU_JIMAKU_URL || undefined);
 
-export const { searchEntries, listFiles, downloadCues } = client;
+export const { searchEntries, listFiles, downloadCues, byAnilist } = client;
 export { cuesFromUpload, matchesEpisode } from '../../shared/jimaku.ts';

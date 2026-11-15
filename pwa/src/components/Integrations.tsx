@@ -71,7 +71,7 @@ export function AniList() {
           <input type="password" autoCapitalize="off" autoCorrect="off" spellCheck={false} value={paste} onChange={(e) => setPaste(e.target.value)} onBlur={() => paste.trim() && save(paste)} />
         </label>
       </div>
-      <p className="footnote">{note ?? 'Ticks off watched episodes. MyAnimeList users can sync AniList to MAL with a tool like MAL-Sync.'}</p>
+      <p className="footnote">{note ?? 'Ticks off watched episodes, and keeps the List tab the same as your AniList Planning list. MyAnimeList users can sync AniList to MAL with a tool like MAL-Sync.'}</p>
     </>
   );
 }

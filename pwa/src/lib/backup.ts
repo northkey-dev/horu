@@ -1,5 +1,6 @@
 import { allKeys, recall, remember } from './mirror.ts';
 import { mergeSkill, type SkillMap } from '../../../shared/kanjiSkill.ts';
+import { cleanList, mergeLists, type Watchlist } from '../../../shared/watchlist.ts';
 
 // A file with everything that lives only on this phone: marks and sessions waiting for the laptop, texts,
 // word status, kanji progress, cards waiting for an export, reader notes and preferences. Nothing secret goes
@@ -11,7 +12,7 @@ const MAGIC = 'horu-phone-backup';
 /** localStorage entries that are not the user's data: pairing, secrets, copies of downloads. */
 const SKIP_LOCAL = /^(horu-laptop|horu-jimaku-key|horu-anilist$|horu-offline-chapters|horu-chapter-pages|horu-dict|horu-kuromoji|horu-manga|horu-pending|horu-flash)/;
 /** IndexedDB entries that hold the user's own data (the rest is a copy of what the laptop said). */
-const KEEP_STORE = /^(cues:|text:|times:)|^(texts|words-local|kanji-skill|kanji-seen|kanji-levels|card-queue)$/;
+const KEEP_STORE = /^(cues:|text:|times:)|^(texts|words-local|kanji-skill|kanji-seen|kanji-levels|card-queue|watchlist)$/;
 const MEDIA = 'horu-local-media';
 
 export type Backup = {
@@ -143,6 +144,7 @@ export async function restoreBackup(file: File): Promise<string> {
     let next: unknown = value;
     if (have !== undefined) {
       if (k === 'kanji-skill') next = mergeSkill(have as SkillMap, value as SkillMap);
+      else if (k === 'watchlist') next = mergeLists(have as Watchlist, cleanList(value));
       else if (k === 'kanji-seen') next = [...new Set([...String(have), ...String(value)])].join('');
       else if (!k.startsWith('cues:') && !k.startsWith('text:') && !k.startsWith('times:')) next = mergeValue(have, value);
     }
