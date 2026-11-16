@@ -28,6 +28,27 @@ test('pickChapters: one per number, the official one; whole volumes apart', () =
   );
 });
 
+test('pickChapters: an uploader tag in place of the title takes the title of the twin', () => {
+  const { chapters } = pickChapters([
+    c(1, 4, 'Ch. 4 - Sorcery and the Enchanted Blade', 'unofficial'),
+    c(2, 4, 'Ch. 4 - (1r0n)', 'official'),
+    c(3, 5, 'Ch. 5 - (1r0n)', 'official'),
+    c(4, 137, 'Ch. 137', 'unofficial'),
+    c(5, 137, 'Ch. 137 - Fork', 'official'),
+    c(6, 138, 'Ch. 138 - Heavy Charge', 'unofficial'),
+    c(7, 138, 'Ch. 138', 'official'),
+  ]);
+  assert.deepEqual(
+    chapters.map((x) => [x.id, x.name]),
+    [
+      [2, 'Ch. 4 - Sorcery and the Enchanted Blade'],
+      [3, 'Ch. 5 - (1r0n)'],
+      [5, 'Ch. 137 - Fork'],
+      [7, 'Ch. 138 - Heavy Charge'],
+    ],
+  );
+});
+
 test('isVolumeBundle: only a volume without a chapter number of its own', () => {
   assert.equal(isVolumeBundle(c(1, 0, 'Ch. 0 - Volume 8')), true);
   assert.equal(isVolumeBundle(c(1, 0, 'Vol.3')), true);

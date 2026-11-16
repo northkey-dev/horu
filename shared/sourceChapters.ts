@@ -14,6 +14,26 @@ export const isVolumeBundle = (c: SourceChapter): boolean => c.chapterNumber <= 
 /** Of two entries for the same chapter: the official one, else the newer upload. */
 const better = (a: SourceChapter, b: SourceChapter) => (official(a) !== official(b) ? official(a) : Number(a.uploadDate ?? 0) > Number(b.uploadDate ?? 0));
 
+/** "Ch. 4 - (1r0n)" → number part "Ch. 4" and title "(1r0n)". */
+function splitName(name: string): { head: string; title: string } {
+  const m = name.match(/^(.*?\d(?:\.\d+)?)\s*(?:[-–:]\s*(.*))?$/);
+  return m ? { head: m[1], title: (m[2] ?? '').trim() } : { head: name, title: name };
+}
+
+/** No real chapter title: nothing, or only a tag in brackets (an uploader's name, "(1r0n)"). */
+const noTitle = (title: string) => !title || /^[([][^)\]]*[)\]]$/.test(title);
+
+/**
+ * The kept entry with a real title: some uploaders put their name where the chapter title goes ("Ch. 4 - (1r0n)");
+ * the left-out twin often has the title ("Ch. 4 - Sorcery and the Enchanted Blade").
+ */
+function titled<T extends SourceChapter>(kept: T, twins: T[]): T {
+  const { head, title } = splitName(kept.name);
+  if (!noTitle(title)) return kept;
+  const better = twins.map((t) => splitName(t.name).title).find((t) => !noTitle(t));
+  return better ? { ...kept, name: `${head} - ${better}` } : kept;
+}
+
 /** One entry per chapter number (unknown numbers, below 0, all stay), in the source's order; whole volumes apart. */
 export function pickChapters<T extends SourceChapter>(list: T[]): { chapters: T[]; volumes: T[] } {
   const best = new Map<number, T>();
@@ -22,11 +42,13 @@ export function pickChapters<T extends SourceChapter>(list: T[]): { chapters: T[
     const had = best.get(c.chapterNumber);
     if (!had || better(c, had)) best.set(c.chapterNumber, c);
   }
-  const keep = new Set(best.values());
-  return {
-    chapters: list.filter((c) => !isVolumeBundle(c) && (c.chapterNumber < 0 || keep.has(c))),
-    volumes: list.filter(isVolumeBundle),
-  };
+  const chapters: T[] = [];
+  for (const c of list) {
+    if (isVolumeBundle(c)) continue;
+    if (c.chapterNumber < 0) chapters.push(c);
+    else if (best.get(c.chapterNumber) === c) chapters.push(titled(c, list.filter((t) => t !== c && t.chapterNumber === c.chapterNumber && !isVolumeBundle(t))));
+  }
+  return { chapters, volumes: list.filter(isVolumeBundle) };
 }
 
 /**
@@ -36,6 +58,6 @@ export function pickChapters<T extends SourceChapter>(list: T[]): { chapters: T[
 export function keptFor<T extends SourceChapter>(all: T[], kept: T[], id: number): T | undefined {
   const was = all.find((c) => c.id === id);
   if (!was) return undefined;
-  if (kept.includes(was)) return was;
-  return was.chapterNumber >= 0 ? kept.find((c) => c.chapterNumber === was.chapterNumber) : undefined;
+  // Compared by id: a kept entry may be a copy with a better title.
+  return kept.find((c) => c.id === id) ?? (was.chapterNumber >= 0 ? kept.find((c) => c.chapterNumber === was.chapterNumber) : undefined);
 }

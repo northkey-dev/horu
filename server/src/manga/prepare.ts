@@ -371,6 +371,12 @@ export async function syncWindows(): Promise<void> {
             lib.removeChapter(c.key);
             continue;
           }
+          // The kept chapter's name may be better now (a real title in place of an uploader's tag).
+          if (kept && !twin && kept.name !== c.name) {
+            lib.updateChapter(c.key, { name: kept.name });
+            const data = lib.readChapterData(c.key);
+            if (data) lib.writeChapterData({ ...data, name: kept.name });
+          }
           const volume = volumes.findIndex((v) => v.id === id);
           const order = kept ? sorted.indexOf(kept) - (twin ? 0.5 : 0) : volume >= 0 ? sorted.length + volume : undefined;
           if (order !== undefined && order !== c.order) lib.updateChapter(c.key, { order });

@@ -2,6 +2,10 @@
 
 Release numbers follow `package.json`. The app, the laptop service and the Chrome extension share one number.
 
+## 1.5.2 (2026-11-16)
+
+Manga sources: a kept chapter whose title is only an uploader tag (*Ch. 4 - (1r0n)*) gets the title of its left-out twin (*Ch. 4 - Sorcery and the Enchanted Blade*), also for chapters already in the library.
+
 ## 1.5.1 (2026-11-16)
 
 Manga sources: **one entry per chapter**: sources that list a chapter twice (MangaFire: official with a tick, and a fan translation) show the official one only; a place in a left-out twin moves to the kept one, and twins not downloaded leave the chapter list. **Whole volumes** posted as one chapter (*Ch. 0 - Volume 8*) are listed apart and no longer taken for the first chapter by the reading window.
