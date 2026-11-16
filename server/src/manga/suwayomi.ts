@@ -213,6 +213,12 @@ export async function chapterPages(chapterId: number): Promise<string[]> {
   return data.fetchChapterPages.pages;
 }
 
+/** Marks many chapters read at once (chapters skipped when you carry on a manga read elsewhere). */
+export async function markChaptersRead(ids: number[]): Promise<void> {
+  if (!ids.length) return;
+  await gql('mutation($ids: [Int!]!) { updateChapters(input: { ids: $ids, patch: { isRead: true } }) { clientMutationId } }', { ids });
+}
+
 export async function markChapterRead(chapterId: number, lastPageRead: number, isRead: boolean): Promise<void> {
   await gql('mutation($id: Int!, $p: Int, $r: Boolean) { updateChapter(input: { id: $id, patch: { lastPageRead: $p, isRead: $r } }) { clientMutationId } }', {
     id: chapterId,

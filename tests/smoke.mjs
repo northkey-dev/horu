@@ -477,6 +477,23 @@ try {
     }
   });
 
+  await check('place: carry on at a chapter number read elsewhere', async () => {
+    const jpeg = new Uint8Array([255, 216, 255, 217]);
+    const zip = zipSync({ '第1話/001.jpg': jpeg, '第2話/001.jpg': jpeg, '第3話/001.jpg': jpeg });
+    const manga = await fetch(`${base}/api/manga/import`, { method: 'POST', headers: { 'X-Filename': 'place.cbz', 'X-Lang': 'en', 'Content-Type': 'application/octet-stream' }, body: zip }).then((r) => r.json());
+    try {
+      const chapters = (await call('GET', `/api/manga/library/${manga.key}/chapters`)).json;
+      const placed = await call('POST', `/api/manga/library/${manga.key}/place`, { chapter: 2 });
+      assert.equal(placed.status, 200);
+      assert.equal(placed.json.chapterKey, chapters.find((c) => c.name === '第2話').key);
+      assert.equal(placed.json.page, 0);
+      assert.equal((await call('POST', `/api/manga/library/${manga.key}/place`, { chapter: 9 })).status, 400);
+      assert.equal((await call('POST', `/api/manga/library/${manga.key}/place`, { chapter: 'x' })).status, 400);
+    } finally {
+      await call('DELETE', `/api/manga/library/${manga.key}`);
+    }
+  });
+
   await check('voice and reading again: refused without anything to work on', async () => {
     assert.equal((await call('POST', '/api/tts', { text: ' ' })).status, 404);
     assert.equal((await call('POST', '/api/manga/chapters/nothing/reread')).status, 400);

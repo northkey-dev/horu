@@ -23,6 +23,7 @@ import { NOT_SHOWN, chartMedia, deleteListEntry, listEntries, matchTitles, media
 import { entryWeight, genreProfile, mergeSeeds, rankRecommendations, topGenres, watchedWeight, type RecEdge, type Recommendation, type Seed } from '../../../shared/recommend.ts';
 import type { JimakuEntry } from '../../../shared/types.ts';
 import { kitsuAnilistIds } from '../../../shared/kitsu.ts';
+import { cleanTitle } from '../../../shared/chapterMatch.ts';
 
 // The List tab on the phone: the list itself (kept here, a copy on the laptop, and the AniList Planning list when
 // AniList is connected), the top charts and the recommendations. AniList is asked straight from the phone;
@@ -171,6 +172,18 @@ async function anilistLists(fresh: boolean): Promise<ListEntry[]> {
   const token = anilistToken();
   if (!token) return [];
   return cached('anilist-entries', 10 * 60_000, () => listEntries(token), fresh).catch(() => []);
+}
+
+/**
+ * How far you are in a manga on AniList (chapters read), when it is on your Reading or Paused list there. Found by
+ * title, so a manga Horu knows only by a source's name works too. Undefined without AniList or without an entry.
+ */
+export async function anilistMangaProgress(title: string): Promise<number | undefined> {
+  if (!anilistToken()) return undefined;
+  const id = (await resolveIds([cleanTitle(title)], 'MANGA'))[cleanTitle(title)];
+  if (!id) return undefined;
+  const entry = (await anilistLists(false)).find((e) => e.media.id === id && ['CURRENT', 'PAUSED', 'REPEATING'].includes(e.status));
+  return entry?.progress || undefined;
 }
 
 // ---- what you watched and read in Horu ----

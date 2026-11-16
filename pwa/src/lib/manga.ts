@@ -144,7 +144,11 @@ export const mangaApi = {
   },
   cachedLibrary: () => readJson<LibraryManga[]>(LIBRARY_KEY, []),
   /** `lang`: the side it is added from, for sources that carry several languages */
-  addToLibrary: (mangaId: number, chapterKey?: string, lang: MangaLang = mangaSide()) => send<LibraryManga>('POST', '/api/manga/library', { mangaId, chapterKey, lang }),
+  /** `startAt`: a chapter number to carry on from (read elsewhere up to there) */
+  addToLibrary: (mangaId: number, chapterKey?: string, lang: MangaLang = mangaSide(), startAt?: number) =>
+    send<LibraryManga>('POST', '/api/manga/library', { mangaId, chapterKey, lang, startAt }),
+  /** Your place in a manga of the library: chapter number. The chapters before count as read in the source, not for XP. */
+  setPlace: (key: string, chapter: number) => send<LibraryManga>('POST', `/api/manga/library/${key}/place`, { chapter }),
   setStatus: (key: string, status: 'reading' | 'paused') => send<LibraryManga>('PATCH', `/api/manga/library/${key}`, { status }),
   /** Pairs the Japanese and the English edition by hand (null: none) */
   setPair: (key: string, pair: string | null) => send<LibraryManga>('PATCH', `/api/manga/library/${key}`, { pair }),

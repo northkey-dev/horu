@@ -2,6 +2,10 @@
 
 Release numbers follow `package.json`. The app, the laptop service and the Chrome extension share one number.
 
+## 1.6.0 (2026-11-16)
+
+Manga: **carry on a manga read elsewhere.** A small link under *Start reading* (*Already read some? Start at a later chapter*) and, for a manga in the library, *Set my place…* in its Edit mode: type a chapter number, Horu prepares from there. With AniList connected, the chapter after your AniList progress is filled in (only read from AniList). Chapters skipped count as read in the source, not for XP or streak.
+
 ## 1.5.2 (2026-11-16)
 
 Manga sources: a kept chapter whose title is only an uploader tag (*Ch. 4 - (1r0n)*) gets the title of its left-out twin (*Ch. 4 - Sorcery and the Enchanted Blade*), also for chapters already in the library.

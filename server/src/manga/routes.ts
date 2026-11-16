@@ -12,6 +12,7 @@ import { enqueue, languageChanged, ocrAvailable, pauseManga, readFrame, readingO
 import { pickChapters } from '../../../shared/sourceChapters.ts';
 import { importArchive } from './importer.ts';
 import { pairChapter, pairOf, resolveAnilistIds, setPair } from './pairs.ts';
+import { markSkipped, setPlace, sourceChapterAt } from './place.ts';
 import { cropAround } from '../crop.ts';
 import { downloadBook, searchServer, serverBooks, serverName } from './servers.ts';
 import { asPrinted } from '../../../shared/readings.ts';
@@ -149,6 +150,8 @@ export function mangaRouter(): express.Router {
       // The source says the language; a multi-language source ("all") follows the side it was added from.
       const lang: lib.MangaLang = lib.getManga(key)?.lang ?? (manga.source?.lang === 'en' ? 'en' : manga.source?.lang === 'all' ? langParam(req.body?.lang) : 'ja');
       checkActive(key, lang);
+      // Read elsewhere up to here: start at this chapter number (place.ts)
+      const startAt = req.body?.startAt === undefined || req.body.startAt === null ? undefined : await sourceChapterAt(id, Number(req.body.startAt));
       await suwa.setInLibrary(id, true).catch(() => {});
       lib.upsertManga({
         key,
@@ -158,10 +161,13 @@ export function mangaRouter(): express.Router {
         addedAt: lib.getManga(key)?.addedAt ?? new Date().toISOString(),
         status: 'reading',
         hasThumb: await saveThumb(key, manga.thumbnailUrl),
-        chapterKey: req.body?.chapterKey ?? lib.getManga(key)?.chapterKey,
+        chapterKey: startAt ? `c${startAt.chapter.id}` : (req.body?.chapterKey ?? lib.getManga(key)?.chapterKey),
+        lastReadAt: startAt ? new Date().toISOString() : lib.getManga(key)?.lastReadAt,
+        page: startAt ? 0 : lib.getManga(key)?.page,
         chaptersRefreshedAt: new Date().toISOString(),
         lang: lang === 'en' ? 'en' : undefined,
       });
+      if (startAt) await markSkipped(startAt.before);
       start();
       scheduleSync(100);
       lookUp();
@@ -193,6 +199,15 @@ export function mangaRouter(): express.Router {
       if (req.body?.pair !== undefined) setPair(key, req.body.pair ? String(req.body.pair) : undefined);
       scheduleSync(100);
       return libraryView().find((m) => m.key === key);
+    }),
+  );
+
+  /** Your place: chapter number (read elsewhere up to there) */
+  r.post(
+    '/library/:key/place',
+    h(async (req) => {
+      await setPlace(param(req, 'key'), Number(req.body?.chapter));
+      return libraryView().find((m) => m.key === param(req, 'key'));
     }),
   );
 

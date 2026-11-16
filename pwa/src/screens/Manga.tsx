@@ -24,6 +24,7 @@ import {
   type SyncProgress,
 } from '../lib/manga.ts';
 import { Reader } from './Reader.tsx';
+import { anilistMangaProgress } from '../lib/watchlist.ts';
 import { Icon } from '../components/Icon.tsx';
 import { Nav } from '../components/Nav.tsx';
 import { WordPrep } from '../components/WordPrep.tsx';
@@ -63,6 +64,57 @@ function Cover({ src, title, big }: { src?: string; title: string; big?: boolean
     <img className={cls} src={src} alt="" loading="lazy" onError={() => setFailed(true)} />
   ) : (
     <div className={`${cls} jp`}>{title.slice(0, 2)}</div>
+  );
+}
+
+/**
+ * Carry on a manga read elsewhere: a quiet link that opens a chapter number field (two taps, so it is not hit by
+ * accident). With AniList connected, the next chapter after your AniList progress is filled in.
+ */
+function StartAt({ title, label, action, busy, onStart }: { title: string; label: string; action: string; busy: boolean; onStart: (chapter: number) => void }) {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState('');
+  const [hint, setHint] = useState<string>();
+  useEffect(() => {
+    if (!open) return;
+    anilistMangaProgress(title).then(
+      (p) => {
+        if (!p) return;
+        setValue((v) => v || String(p + 1));
+        setHint(`Your AniList says chapter ${p} is read.`);
+      },
+      () => undefined,
+    );
+  }, [open, title]);
+  if (!open)
+    return (
+      <button className="ghost small start-at-link" onClick={() => setOpen(true)}>
+        {label}
+      </button>
+    );
+  const n = Number(value);
+  return (
+    <div className="start-at">
+      <form
+        className="row"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (value.trim() && n >= 0) onStart(n);
+        }}
+      >
+        <span className="small muted">Chapter</span>
+        <input type="number" inputMode="decimal" min="0" step="any" value={value} onChange={(e) => setValue(e.target.value)} aria-label="Chapter number" />
+        <button className="small" disabled={busy || !value.trim() || !(n >= 0)}>
+          {busy ? <span className="spinner" /> : action}
+        </button>
+        <button type="button" className="ghost small" onClick={() => setOpen(false)}>
+          Cancel
+        </button>
+      </form>
+      <p className="footnote">
+        {hint ? `${hint} ` : ''}Horu prepares from this chapter on. The ones before count as read in the source, not for your XP.
+      </p>
+    </div>
   );
 }
 
@@ -434,6 +486,21 @@ function LocalDetail({ mangaKey, online }: { mangaKey: string; online: boolean }
     }
   }
 
+  async function placeAt(chapter: number) {
+    setActing('place');
+    setError(undefined);
+    try {
+      await mangaApi.setPlace(mangaKey, chapter);
+      await mangaApi.library();
+      setEditing(false);
+      refresh();
+    } catch (e) {
+      setError(describeError(e));
+    } finally {
+      setActing(undefined);
+    }
+  }
+
   async function pairWith(other: string) {
     try {
       await mangaApi.setPair(mangaKey, other || null);
@@ -503,7 +570,7 @@ function LocalDetail({ mangaKey, online }: { mangaKey: string; online: boolean }
 
       <div className="row section-head">
         <h2 className="grow">Chapters</h2>
-        {online && chapters.some((c) => c.status === 'ready') && (
+        {online && (chapters.length > 0 || mangaKey.startsWith('s')) && (
           <button className="small ghost" onClick={() => setEditing(!editing)}>
             {editing ? 'Done' : 'Edit'}
           </button>
@@ -519,6 +586,9 @@ function LocalDetail({ mangaKey, online }: { mangaKey: string; online: boolean }
             </div>
           </div>
         </div>
+      )}
+      {editing && manga && (
+        <StartAt title={manga.title} label="Read further elsewhere? Set my place…" action="Set" busy={acting === 'place'} onStart={(n) => void placeAt(n)} />
       )}
       {editing && !english && (
         <div className="group">
@@ -980,11 +1050,11 @@ function RemoteDetail({ id }: { id: number }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  async function startReading(chapterKey?: string) {
+  async function startReading(chapterKey?: string, startAt?: number) {
     setBusy('add');
     setError(undefined);
     try {
-      await mangaApi.addToLibrary(id, chapterKey);
+      await mangaApi.addToLibrary(id, chapterKey, undefined, startAt);
       await load();
     } catch (e) {
       setError(describeError(e));
@@ -1031,9 +1101,12 @@ function RemoteDetail({ id }: { id: number }) {
       {error && <div className="banner error">{error}</div>}
 
       {!manga.active ? (
-        <button className="primary block" disabled={busy === 'add'} onClick={() => startReading()}>
-          {busy === 'add' ? 'Adding…' : 'Start reading'}
-        </button>
+        <>
+          <button className="primary block" disabled={busy === 'add'} onClick={() => startReading()}>
+            {busy === 'add' ? 'Adding…' : 'Start reading'}
+          </button>
+          <StartAt title={manga.title} label="Already read some? Start at a later chapter" action="Start there" busy={busy === 'add'} onStart={(n) => void startReading(undefined, n)} />
+        </>
       ) : (
         <div className="banner info">In your library ({manga.active.status}). The next chapters are prepared automatically while the laptop is on.</div>
       )}
