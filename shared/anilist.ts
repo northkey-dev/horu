@@ -173,7 +173,33 @@ export async function matchTitles(titles: string[], type: MediaKind): Promise<(M
 
 /** Who made it: the mangaka (story, art) or the original creator, with the Japanese name when AniList has it. */
 export type Creator = { name: string; native?: string; roles: string[] };
-export type MediaDetail = Media & { description?: string; url?: string; creators: Creator[] };
+/**
+ * `status`: AniList's FINISHED, RELEASING, NOT_YET_RELEASED, CANCELLED or HIATUS. `aired`: episodes out so far while
+ * an anime airs (AniList knows the next one). `volumes`: manga volumes once AniList counts them.
+ */
+export type MediaDetail = Media & { description?: string; url?: string; creators: Creator[]; status?: string; aired?: number; volumes?: number };
+
+const STATUS: Record<string, string> = { FINISHED: 'Finished', RELEASING: 'Ongoing', NOT_YET_RELEASED: 'Not out yet', CANCELLED: 'Cancelled', HIATUS: 'On hiatus' };
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/**
+ * How far a title is: "Finished · 24 episodes", "Ongoing · 11 of 24 episodes out", "Ongoing · 1 volume so far". AniList
+ * leaves the chapter count of a running manga open, so there is none then.
+ */
+export function releaseLine(d: Pick<MediaDetail, 'type' | 'status' | 'episodes' | 'chapters' | 'aired' | 'volumes'>): { status?: string; count?: string } {
+  const status = d.status ? STATUS[d.status] : undefined;
+  const running = d.status === 'RELEASING' || d.status === 'HIATUS';
+  let count: string | undefined;
+  if (d.type === 'ANIME') {
+    if (running && d.aired !== undefined) count = d.episodes ? `${d.aired} of ${plural(d.episodes, 'episode')} out` : `${plural(d.aired, 'episode')} out so far`;
+    else if (d.episodes) count = d.status === 'NOT_YET_RELEASED' ? `${plural(d.episodes, 'episode')} planned` : plural(d.episodes, 'episode');
+  } else {
+    const parts = [d.chapters && plural(d.chapters, 'chapter'), d.volumes && plural(d.volumes, 'volume')].filter(Boolean);
+    if (parts.length) count = parts.join(' · ') + (running ? ' so far' : '');
+    else if (running) count = 'chapter count still open';
+  }
+  return { status, count };
+}
 
 const CREATOR_ROLES = new Set(['Story & Art', 'Story', 'Art', 'Original Creator', 'Original Story']);
 
@@ -194,10 +220,17 @@ export function creatorsOf(edges: StaffEdge[]): Creator[] {
 }
 
 export async function mediaDetail(id: number): Promise<MediaDetail> {
-  type R = RawMedia & { description: string | null; siteUrl: string | null; staff: { edges: StaffEdge[] } | null };
+  type R = RawMedia & {
+    description: string | null;
+    siteUrl: string | null;
+    status: string | null;
+    volumes: number | null;
+    nextAiringEpisode: { episode: number } | null;
+    staff: { edges: StaffEdge[] } | null;
+  };
   const r = await gql<{ Media: R }>(
     '',
-    `query ($id: Int) { Media(id: $id) { ${FIELDS} description(asHtml: false) siteUrl staff(sort: [RELEVANCE, ROLE], perPage: 12) { edges { role node { name { full native } } } } } }`,
+    `query ($id: Int) { Media(id: $id) { ${FIELDS} description(asHtml: false) siteUrl status volumes nextAiringEpisode { episode } staff(sort: [RELEVANCE, ROLE], perPage: 12) { edges { role node { name { full native } } } } } }`,
     { id },
   );
   const description = r.Media.description
@@ -208,7 +241,16 @@ export async function mediaDetail(id: number): Promise<MediaDetail> {
     .replace(/&amp;/g, '&')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
-  return { ...toMedia(r.Media), description: description || undefined, url: r.Media.siteUrl ?? undefined, creators: creatorsOf(r.Media.staff?.edges ?? []) };
+  const next = r.Media.nextAiringEpisode?.episode;
+  return {
+    ...toMedia(r.Media),
+    description: description || undefined,
+    url: r.Media.siteUrl ?? undefined,
+    creators: creatorsOf(r.Media.staff?.edges ?? []),
+    status: opt(r.Media.status),
+    aired: next ? next - 1 : undefined,
+    volumes: opt(r.Media.volumes),
+  };
 }
 
 let viewer: { token: string; id: number } | undefined;

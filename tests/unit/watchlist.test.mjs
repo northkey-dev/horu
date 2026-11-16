@@ -187,3 +187,14 @@ test('ranking: shared recommendations add up, seen titles stay out, genres tilt'
   assert.deepEqual(picks.map((p) => p.media.id), [11, 12, 10]);
   assert.deepEqual(picks[0].because.map((b) => b.title), ['B', 'A'], 'strongest reason first');
 });
+
+test('releaseLine: status and how many episodes or chapters', async () => {
+  const { releaseLine } = await import('../../shared/anilist.ts');
+  assert.deepEqual(releaseLine({ type: 'ANIME', status: 'FINISHED', episodes: 24 }), { status: 'Finished', count: '24 episodes' });
+  assert.deepEqual(releaseLine({ type: 'ANIME', status: 'RELEASING', episodes: 24, aired: 11 }), { status: 'Ongoing', count: '11 of 24 episodes out' });
+  assert.deepEqual(releaseLine({ type: 'ANIME', status: 'RELEASING', aired: 1 }), { status: 'Ongoing', count: '1 episode out so far' });
+  assert.deepEqual(releaseLine({ type: 'ANIME', status: 'NOT_YET_RELEASED', episodes: 12 }), { status: 'Not out yet', count: '12 episodes planned' });
+  assert.deepEqual(releaseLine({ type: 'MANGA', status: 'FINISHED', chapters: 139, volumes: 14 }), { status: 'Finished', count: '139 chapters · 14 volumes' });
+  assert.deepEqual(releaseLine({ type: 'MANGA', status: 'RELEASING' }), { status: 'Ongoing', count: 'chapter count still open' });
+  assert.deepEqual(releaseLine({ type: 'MANGA', status: 'HIATUS', volumes: 3 }), { status: 'On hiatus', count: '3 volumes so far' });
+});

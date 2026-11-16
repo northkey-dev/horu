@@ -2,6 +2,10 @@
 
 Release numbers follow `package.json`. The app, the laptop service and the Chrome extension share one number.
 
+## 1.2.1 (2026-11-16)
+
+List tab, title sheet: **finished or ongoing** (also not out yet, cancelled, on hiatus) and the length: episodes (while airing: how many are out of how many), chapters and volumes of a manga.
+
 ## 1.2.0 (2026-11-15)
 
 List tab:

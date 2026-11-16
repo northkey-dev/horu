@@ -162,7 +162,7 @@ export function suggest(q: string, type: MediaKind): Promise<Media[]> {
 }
 export const chart = (c: Chart, type: MediaKind, page: number, genre: string, fresh = false) =>
   cached(`al:chart:${c}:${type}:${genre}:${page}`, 12 * HOUR, () => chartMedia(c, type, page, genre || undefined), fresh);
-export const detail = (id: number): Promise<MediaDetail> => cached(`al:media2:${id}`, 7 * 24 * HOUR, () => mediaDetail(id));
+export const detail = (id: number): Promise<MediaDetail> => cached(`al:media3:${id}`, 24 * HOUR, () => mediaDetail(id));
 
 /** Your AniList lists (empty without AniList). */
 async function anilistLists(fresh: boolean): Promise<ListEntry[]> {

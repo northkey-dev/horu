@@ -26,7 +26,7 @@ import {
   type ForYou,
 } from '../lib/watchlist.ts';
 import { isMarked, liveItems, markedItems, onList, type MarkKind, type Media, type MediaKind, type Watchlist } from '../../../shared/watchlist.ts';
-import type { Chart, MediaDetail } from '../../../shared/anilist.ts';
+import { releaseLine, type Chart, type MediaDetail } from '../../../shared/anilist.ts';
 import type { Recommendation, SeedWhy } from '../../../shared/recommend.ts';
 import type { JimakuEntry } from '../../../shared/types.ts';
 import { Icon } from '../components/Icon.tsx';
@@ -618,6 +618,7 @@ function MediaSheet({ media, because, list, started, onClose }: { media: Media; 
   const dismissed = isMarked(list, 'dismissed', media.id);
   const seen = isMarked(list, 'seen', media.id);
   const anime = media.type === 'ANIME';
+  const release = info && (info.status || info.episodes || info.chapters) ? releaseLine(info) : undefined;
 
   useEffect(() => {
     void detail(media.id).then(setInfo, () => undefined);
@@ -643,6 +644,12 @@ function MediaSheet({ media, because, list, started, onClose }: { media: Media; 
             <div className="sub" style={{ marginTop: 4 }}>
               {metaLine(m)}
             </div>
+            {release && (
+              <div className="sub media-status">
+                {release.status && <span className={`tag${info?.status === 'FINISHED' ? ' common' : ''}`}>{release.status}</span>}
+                {release.count}
+              </div>
+            )}
             {!!info?.creators.length && (
               <div className="media-creators">
                 {info.creators.map((c) => (

@@ -821,3 +821,5 @@ button.ghost.on { color: var(--accent); font-weight: 600; }
 .suggest .media-open { padding: 7px 0; min-height: 0; align-items: center; gap: 12px; }
 .suggest .media-open .grow { gap: 0; }
 .media-creators { margin-top: 4px; }
+.media-status { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.media-status .tag { margin-left: 0; vertical-align: 0; }
