@@ -27,7 +27,7 @@ import {
   type ForYou,
 } from '../lib/watchlist.ts';
 import { isMarked, liveItems, markedItems, onList, type MarkKind, type Media, type MediaKind, type Watchlist } from '../../../shared/watchlist.ts';
-import { releaseLine, seriesSummary, type Chart, type MediaDetail, type Part } from '../../../shared/anilist.ts';
+import { releaseLine, seriesSummary, type Chart, type MediaDetail, type Part, type Series } from '../../../shared/anilist.ts';
 import type { Recommendation, SeedWhy } from '../../../shared/recommend.ts';
 import type { JimakuEntry } from '../../../shared/types.ts';
 import { Icon } from '../components/Icon.tsx';
@@ -148,7 +148,12 @@ function Lists({ route }: { route: string[] }) {
       {view === 'top' && <Top {...ctx} />}
 
       {open && list && (
-        <MediaSheet key={open.media.id} media={open.media} because={open.because} list={list} started={started.has(open.media.id)} onOpen={(m) => show(m)} onClose={() => setOpen(undefined)} />
+        <MediaSheet key={open.media.id} media={open.media} because={open.because} list={list} started={started.has(open.media.id)} onOpen={(m) => {
+            // The manga of an anime (or the other way round): the list behind the sheet switches with it.
+            if (m.type !== type) setType(m.type);
+            show(m);
+          }}
+          onClose={() => setOpen(undefined)} />
       )}
     </div>
   );
@@ -627,7 +632,8 @@ function MediaSheet({
   onClose: () => void;
 }) {
   const [info, setInfo] = useState<MediaDetail>();
-  const [parts, setParts] = useState<Part[]>();
+  const [whole, setWhole] = useState<Series>();
+  const parts = whole?.parts;
   const [more, setMore] = useState(false);
   const [subs, setSubs] = useState<JimakuEntry | null | undefined | 'checking' | 'failed'>('checking');
   const [coverage, setCoverage] = useState<number>();
@@ -637,11 +643,11 @@ function MediaSheet({
   const seen = isMarked(list, 'seen', media.id);
   const anime = media.type === 'ANIME';
   const release = info && (info.status || info.episodes || info.chapters) ? releaseLine(info) : undefined;
-  const whole = parts && parts.length > 1 ? seriesSummary(parts, media.id) : undefined;
+  const summary = parts && parts.length > 1 ? seriesSummary(parts, media.id) : undefined;
 
   useEffect(() => {
     void detail(media.id).then(setInfo, () => undefined);
-    void series(media.id).then(setParts, () => undefined);
+    void series(media.id).then(setWhole, () => undefined);
     if (media.type !== 'ANIME') return;
     subtitlesFor(media).then(
       (entry) => {
@@ -670,12 +676,12 @@ function MediaSheet({
                 {release.count}
               </div>
             )}
-            {whole?.next && (
+            {summary?.next && (
               <div className="sub media-status">
                 <span className="tag">Series</span>
-                {whole.nextState === 'running' ? 'Still running: ' : 'Goes on: '}
-                {whole.next.title}
-                {whole.nextState === 'running' ? (anime ? ' airing now' : ' coming out now') : whole.next.start ? ` announced for ${whole.next.start.slice(0, 4)}` : ' announced'}
+                {summary.nextState === 'running' ? 'Still running: ' : 'Goes on: '}
+                {summary.next.title}
+                {summary.nextState === 'running' ? (anime ? ' airing now' : ' coming out now') : summary.next.start ? ` announced for ${summary.next.start.slice(0, 4)}` : ' announced'}
               </div>
             )}
             {!!info?.creators.length && (
@@ -728,10 +734,26 @@ function MediaSheet({
           </button>
         )}
 
+        {whole?.linked && (
+          <>
+            <h2>{anime ? 'The manga' : 'The anime'}</h2>
+            <div className="group part-list">
+              <button className="list-item" onClick={() => onOpen(whole.linked!)}>
+                <Cover m={whole.linked} small />
+                <span className="grow">
+                  <span className="ellipsis">{whole.linked.title}</span>
+                  <span className="sub ellipsis">{[FORMATS[whole.linked.format ?? ''], whole.linked.year, releaseLine(whole.linked).count, releaseLine(whole.linked).status].filter(Boolean).join(' · ')}</span>
+                </span>
+                <Icon name="chevron" size={16} weight={2} />
+              </button>
+            </div>
+          </>
+        )}
+
         {parts && parts.length > 1 && (
           <>
             <h2>{anime ? 'All seasons' : 'All parts'}</h2>
-            <div className="group">
+            <div className="group part-list">
               {parts.map((p) => {
                 const here = p.id === media.id;
                 const r = releaseLine(p);
@@ -755,9 +777,9 @@ function MediaSheet({
                 );
               })}
             </div>
-            {whole?.total && (
+            {summary?.total && (
               <p className="footnote">
-                {whole.total}
+                {summary.total}
                 {anime ? ', films and specials not counted.' : '.'}
               </p>
             )}

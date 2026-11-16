@@ -272,14 +272,34 @@ function toPart(r: RawPart): Part {
 /** Parts without a start date (announced, no date yet) go last; otherwise by start date. */
 export const orderParts = (parts: Part[]): Part[] => [...parts].sort((a, b) => (a.start ?? '9999').localeCompare(b.start ?? '9999') || a.id - b.id);
 
+/** A title of the other kind the series comes from or was made into (the manga of an anime, the anime of a manga). */
+export type Linked = Part & { fromOpen: boolean };
+
+/**
+ * The one counterpart to offer: links of the open title first, then the main format (the manga itself, the first TV
+ * season) before one-shots, films and specials, then the oldest. Light novels and music videos are left out.
+ */
+export function pickLinked(cands: Linked[]): Part | undefined {
+  const main = (p: Part) => (p.format === 'MANGA' || p.format === 'TV' ? 0 : p.format === 'TV_SHORT' || p.format === 'ONA' ? 1 : 2);
+  const ok = cands.filter((c) => c.format !== 'NOVEL' && c.format !== 'MUSIC');
+  ok.sort((a, b) => Number(b.fromOpen) - Number(a.fromOpen) || main(a) - main(b) || (a.start ?? '9999').localeCompare(b.start ?? '9999'));
+  if (!ok[0]) return undefined;
+  const { fromOpen: _, ...part } = ok[0];
+  return part;
+}
+
+export type Series = { parts: Part[]; linked?: Part };
+
 /**
  * Every part of the series a title belongs to: AniList keeps each season as its own title, linked as prequel and
- * sequel. Walks those links both ways (one call per step, at most 8 steps and 30 parts), oldest first.
+ * sequel. Walks those links both ways (one call per step, at most 8 steps and 30 parts), oldest first. On the way
+ * it collects the source and adaptations of the other kind (`linked`: the manga of an anime and the other way round).
  */
-export async function seriesParts(id: number): Promise<Part[]> {
+export async function seriesParts(id: number): Promise<Series> {
   type Edge = { relationType: string; node: RawPart | null };
   type R = { Page: { media: (RawPart & { relations: { edges: Edge[] } | null })[] } };
   const found = new Map<number, Part>();
+  const other = new Map<number, Linked>();
   let type: MediaKind | undefined;
   let frontier = [id];
   for (let step = 0; step < 8 && frontier.length && found.size < 30; step++) {
@@ -290,14 +310,19 @@ export async function seriesParts(id: number): Promise<Part[]> {
       found.set(m.id, toPart(m));
       for (const e of m.relations?.edges ?? []) {
         const n = e.node;
-        if (!n || n.type !== type || (e.relationType !== 'PREQUEL' && e.relationType !== 'SEQUEL') || found.has(n.id) || next.includes(n.id)) continue;
+        if (!n) continue;
+        if (n.type !== type) {
+          if ((e.relationType === 'SOURCE' || e.relationType === 'ADAPTATION') && (!other.has(n.id) || m.id === id)) other.set(n.id, { ...toPart(n), fromOpen: m.id === id });
+          continue;
+        }
+        if ((e.relationType !== 'PREQUEL' && e.relationType !== 'SEQUEL') || found.has(n.id) || next.includes(n.id)) continue;
         found.set(n.id, toPart(n));
         next.push(n.id);
       }
     }
     frontier = next;
   }
-  return orderParts([...found.values()]).slice(0, 30);
+  return { parts: orderParts([...found.values()]).slice(0, 30), linked: pickLinked([...other.values()]) };
 }
 
 /** Parts that count as episodes of the series: TV seasons and web series; films, specials, OVAs and one-off web episodes are extra. */

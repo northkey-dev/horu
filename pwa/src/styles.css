@@ -407,7 +407,7 @@ label.toggle input:checked::before { transform: translateX(20px); background: va
 
 .sheet-backdrop { position: fixed; inset: 0; background: var(--scrim); z-index: 20; animation: fade 0.25s ease-out; }
 .sheet {
-  position: fixed; left: 0; right: 0; bottom: 0; max-height: 76vh; overflow: auto; z-index: 21; max-width: 680px; margin: 0 auto;
+  position: fixed; left: 0; right: 0; bottom: 0; max-height: 76vh; overflow: hidden auto; z-index: 21; max-width: 680px; margin: 0 auto;
   background: var(--card); border-radius: 14px 14px 0 0; overscroll-behavior: contain; color: var(--ink);
   padding: 8px 24px calc(22px + env(safe-area-inset-bottom)); box-shadow: 0 -1px 0 var(--line-strong), 0 -12px 40px rgba(0, 0, 0, 0.22);
   animation: rise 0.36s cubic-bezier(0.2, 0.9, 0.25, 1);
@@ -824,3 +824,5 @@ button.ghost.on { color: var(--accent); font-weight: 600; }
 .media-status { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
 .media-status .tag { margin-left: 0; vertical-align: 0; }
 .season-here { cursor: default; box-shadow: inset 3px 0 0 var(--ink); }
+.part-list .grow { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.part-list .list-item { gap: 12px; }

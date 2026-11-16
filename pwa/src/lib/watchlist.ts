@@ -19,7 +19,7 @@ import {
   type MediaKind,
   type Watchlist,
 } from '../../../shared/watchlist.ts';
-import { NOT_SHOWN, chartMedia, deleteListEntry, listEntries, matchTitles, mediaByIds, mediaDetail, recommendationsFor, saveStatus, searchMedia, seriesParts, type Chart, type MediaDetail, type Part } from '../../../shared/anilist.ts';
+import { NOT_SHOWN, chartMedia, deleteListEntry, listEntries, matchTitles, mediaByIds, mediaDetail, recommendationsFor, saveStatus, searchMedia, seriesParts, type Chart, type MediaDetail, type Series } from '../../../shared/anilist.ts';
 import { entryWeight, genreProfile, mergeSeeds, rankRecommendations, topGenres, watchedWeight, type RecEdge, type Recommendation, type Seed } from '../../../shared/recommend.ts';
 import type { JimakuEntry } from '../../../shared/types.ts';
 import { kitsuAnilistIds } from '../../../shared/kitsu.ts';
@@ -163,8 +163,8 @@ export function suggest(q: string, type: MediaKind): Promise<Media[]> {
 export const chart = (c: Chart, type: MediaKind, page: number, genre: string, fresh = false) =>
   cached(`al:chart:${c}:${type}:${genre}:${page}`, 12 * HOUR, () => chartMedia(c, type, page, genre || undefined), fresh);
 export const detail = (id: number): Promise<MediaDetail> => cached(`al:media3:${id}`, 24 * HOUR, () => mediaDetail(id));
-/** All seasons of the series the title belongs to (AniList keeps each season apart). */
-export const series = (id: number): Promise<Part[]> => cached(`al:series:${id}`, 24 * HOUR, () => seriesParts(id));
+/** All seasons of the series the title belongs to (AniList keeps each season apart), and its manga or anime. */
+export const series = (id: number): Promise<Series> => cached(`al:series2:${id}`, 24 * HOUR, () => seriesParts(id));
 
 /** Your AniList lists (empty without AniList). */
 async function anilistLists(fresh: boolean): Promise<ListEntry[]> {

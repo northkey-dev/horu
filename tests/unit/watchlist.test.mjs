@@ -227,3 +227,13 @@ test('releaseLine: a film has no episode count; one-off web episodes do not coun
   const p = (id, extra) => ({ id, type: 'ANIME', title: `S${id}`, genres: [], ...extra });
   assert.deepEqual(seriesSummary([p(1, { format: 'TV', status: 'RELEASING', aired: 1180 }), p(2, { format: 'ONA', status: 'FINISHED', episodes: 1 })], 1), {});
 });
+
+test('pickLinked: the manga of an anime, the first TV season of a manga; no light novels', async () => {
+  const { pickLinked } = await import('../../shared/anilist.ts');
+  const c = (id, format, fromOpen, start) => ({ id, type: 'X', title: `T${id}`, genres: [], format, fromOpen, start });
+  assert.equal(pickLinked([c(1, 'NOVEL', true), c(2, 'MANGA', false, '2018-03-05'), c(3, 'ONE_SHOT', false, '2017-01-01')]).id, 2);
+  assert.equal(pickLinked([c(10, 'MANGA', false), c(11, 'ONE_SHOT', true)]).id, 11);
+  assert.equal(pickLinked([c(20, 'MOVIE', true, '2021-12-24'), c(21, 'TV', true, '2023-07-06'), c(22, 'TV', true, '2020-10-03')]).id, 22);
+  assert.equal(pickLinked([c(30, 'NOVEL', true)]), undefined);
+  assert.equal('fromOpen' in pickLinked([c(2, 'MANGA', true)]), false);
+});
