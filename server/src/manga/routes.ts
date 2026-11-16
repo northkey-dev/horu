@@ -10,6 +10,7 @@ import * as lib from './library.ts';
 import * as suwa from './suwayomi.ts';
 import { enqueue, languageChanged, ocrAvailable, pauseManga, readFrame, rereadChapter, resumeChapter, scheduleSync, sortChapters, startMangaWorker as start, stopChapter } from './prepare.ts';
 import { importArchive } from './importer.ts';
+import { pairChapter, pairOf, resolveAnilistIds, setPair } from './pairs.ts';
 import { cropAround } from '../crop.ts';
 import { downloadBook, searchServer, serverBooks, serverName } from './servers.ts';
 import { asPrinted } from '../../../shared/readings.ts';
@@ -74,6 +75,8 @@ function libraryView() {
       ready: chapters.filter((c) => c.status === 'ready').length,
       preparing: chapters.filter((c) => c.status !== 'ready' && c.status !== 'error').length,
       failed: chapters.filter((c) => c.status === 'error').length,
+      /** The other edition (Japanese ↔ English) */
+      pair: pairOf(m)?.key,
     };
   });
 }
@@ -81,6 +84,9 @@ function libraryView() {
 export function mangaRouter(): express.Router {
   const r = express.Router();
   r.use(express.json());
+  // Editions of manga added before English ones came pair once their AniList ids are known.
+  setTimeout(() => void resolveAnilistIds(), 20_000).unref();
+  const lookUp = () => void resolveAnilistIds();
 
   r.get(
     '/status',
@@ -155,6 +161,7 @@ export function mangaRouter(): express.Router {
       });
       start();
       scheduleSync(100);
+      lookUp();
       return libraryView().find((m) => m.key === key);
     }),
   );
@@ -172,9 +179,15 @@ export function mangaRouter(): express.Router {
       if (status === 'reading' || (lang && manga.status === 'reading')) checkActive(key, newLang);
       if (status) lib.updateManga(key, { status });
       if (lang && lang !== (manga.lang ?? 'ja')) {
-        lib.updateManga(key, { lang: lang === 'en' ? 'en' : undefined, notJapanese: undefined });
+        // A pair belonged to the old language: both editions go back to pairing by themselves.
+        const old = pairOf(manga);
+        if (old?.pairWith === key) lib.updateManga(old.key, { pairWith: undefined });
+        lib.updateManga(key, { lang: lang === 'en' ? 'en' : undefined, notJapanese: undefined, pairWith: undefined });
         languageChanged(key);
+        lookUp();
       }
+      // The other edition, by hand: its key, or null for none
+      if (req.body?.pair !== undefined) setPair(key, req.body.pair ? String(req.body.pair) : undefined);
       scheduleSync(100);
       return libraryView().find((m) => m.key === key);
     }),
@@ -228,6 +241,11 @@ export function mangaRouter(): express.Router {
       }),
     );
   }
+  /** The matching chapter of the other edition, fetched now when it is not there yet */
+  r.post(
+    '/chapters/:key/pair',
+    h((req) => pairChapter(param(req, 'key'))),
+  );
   r.post(
     '/chapters/:key/resume',
     h((req) => {
@@ -416,6 +434,7 @@ export function mangaRouter(): express.Router {
     h((req) => {
       const fileName = decodeURIComponent(String(req.headers['x-filename'] ?? 'import.cbz'));
       const key = importArchive(new Uint8Array(req.body as Buffer), fileName, { lang: langParam(req.headers['x-lang']) });
+      lookUp();
       return libraryView().find((m) => m.key === key);
     }),
   );
@@ -430,6 +449,7 @@ export function mangaRouter(): express.Router {
       const { seriesId, seriesName, bookId, bookName, lang } = req.body as { seriesId: string; seriesName: string; bookId: string; bookName: string; lang?: string };
       const zip = await downloadBook(bookId);
       const key = importArchive(zip, `${bookName}.cbz`, { mangaKey: `k${seriesId.replace(/[^\w-]/g, '')}`, mangaTitle: seriesName, chapterName: bookName, source: serverName(), lang: langParam(lang) });
+      lookUp();
       return libraryView().find((m) => m.key === key);
     }),
   );

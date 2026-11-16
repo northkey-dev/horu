@@ -788,6 +788,10 @@ button.ghost.on { color: var(--accent); font-weight: 600; }
 
 .list-type { margin-top: 10px; }
 .manga-side { margin-bottom: 18px; }
+.reader .en-btn { flex: none; width: 44px; height: 30px; min-height: 30px; padding: 0; border-radius: 6px; border: 1.5px solid currentColor; background: transparent; color: inherit; font: 700 13px/1 var(--font); letter-spacing: 0.04em; }
+.reader .en-btn.on { background: #eee7da; border-color: #eee7da; color: #1b1a17; }
+.en-shift { display: inline-flex; align-items: center; gap: 4px; }
+.en-shift button { min-height: 30px; height: 30px; padding: 0 10px; font-size: 18px; color: inherit; }
 .list-top-bar { margin-top: 18px; gap: 10px; }
 .list-top-bar select { width: auto; flex: none; max-width: 42%; }
 .media-row { display: flex; align-items: center; gap: 8px; }

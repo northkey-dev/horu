@@ -2,6 +2,13 @@
 
 Release numbers follow `package.json`. The app, the laptop service and the Chrome extension share one number.
 
+## 1.5.0 (2026-11-16)
+
+**EN in the Japanese manga reader:** with the English edition of the manga in the library, EN at the top shows the English page of the chapter you read in place of the Japanese one.
+- Editions pair by themselves through AniList (titles looked up once there is an English manga), or by hand: *English edition* / *Japanese edition* on the manga.
+- Chapters match by number (*第12話* ↔ *Chapter 12*, *第3巻* ↔ *Vol. 3*); a chapter not there yet is fetched from the English online source first, then kept for the days read chapters are kept.
+- **‹ ›** moves the English page when the editions are a page apart; kept per manga.
+
 ## 1.4.0 (2026-11-16)
 
 **English manga** in the Manga screen: **日本語 | English** at the top, each side with its own *Continue*, *Reading*, *Paused*, sources (+), file import and Komga/Kavita import; the side you are on sets the language of what you add.

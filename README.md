@@ -199,6 +199,12 @@ At the top of the Manga screen, **日本語 | English** switches between two sid
 - **On the wrong side?** Open the manga → **Move to English** / **Move to 日本語**. Moved to Japanese, the laptop reads the text of its chapters.
 - *On this phone* (Sync) and *Storage* are at the bottom and cover both sides.
 
+**Compare with the English page.** Have the same manga on both sides (say チェンソーマン from a Japanese source and Chainsaw Man as English files), and the Japanese reader gets an **EN** button at the top. It shows the English page of the chapter you read in place of the Japanese one; tap it again for the Japanese page. Turning pages moves both.
+- Horu pairs the two editions by itself when AniList knows both titles as the same manga (it looks the titles up once you have an English manga). Otherwise, or to change it: open the manga → **English edition** (or *Japanese edition*) at the bottom.
+- The chapter is found by its number: *第12話* goes with *Chapter 12*, *第3巻* with *Vol. 3*. If the English edition comes from an online source and that chapter is not downloaded yet, the laptop gets it first (a line says how far it is). Chapters fetched this way are kept for the days set for read chapters.
+- If credit or colour pages put the editions a page apart, **‹ ›** next to *EN 5 of 20* at the bottom moves the English page; Horu keeps that per manga on the phone.
+- The English page needs the laptop, unless that chapter is saved on the phone.
+
 ### 1. Add a source (once)
 
 Horu ships **no** manga sources and no source repository. Which sites you read, and whether that is allowed where you live, is your responsibility. Official free services (for example Shōnen Jump+, Comic Days, Magazine Pocket) work well, and your own files and Komga/Kavita always work.

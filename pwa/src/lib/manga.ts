@@ -26,6 +26,8 @@ export type LibraryManga = {
   ready: number;
   preparing: number;
   failed: number;
+  /** The other edition (Japanese ↔ English), paired through AniList or by hand */
+  pair?: string;
 };
 
 export type PreparedChapter = {
@@ -144,6 +146,10 @@ export const mangaApi = {
   /** `lang`: the side it is added from, for sources that carry several languages */
   addToLibrary: (mangaId: number, chapterKey?: string, lang: MangaLang = mangaSide()) => send<LibraryManga>('POST', '/api/manga/library', { mangaId, chapterKey, lang }),
   setStatus: (key: string, status: 'reading' | 'paused') => send<LibraryManga>('PATCH', `/api/manga/library/${key}`, { status }),
+  /** Pairs the Japanese and the English edition by hand (null: none) */
+  setPair: (key: string, pair: string | null) => send<LibraryManga>('PATCH', `/api/manga/library/${key}`, { pair }),
+  /** The matching chapter of the other edition; fetched on the laptop when it is not there yet */
+  pairChapter: (key: string) => send<{ manga?: { key: string; title: string }; chapter?: PreparedChapter; missing?: boolean }>('POST', `/api/manga/chapters/${key}/pair`),
   /** Moves a manga to the other side (Japanese with text recognition, or English, only read) */
   setLang: (key: string, lang: MangaLang) => send<LibraryManga>('PATCH', `/api/manga/library/${key}`, { lang }),
   remove: (key: string) => send('DELETE', `/api/manga/library/${key}`),
@@ -218,6 +224,14 @@ export const langOf = (m?: { lang?: MangaLang }): MangaLang => m?.lang ?? 'ja';
 
 /** The language of a manga by its key, from the library this phone knows (also offline). */
 export const mangaLangByKey = (mangaKey: string): MangaLang => langOf(mangaApi.cachedLibrary().find((m) => m.key === mangaKey));
+
+// How many pages the English edition is ahead (+) or behind (-) the Japanese one, per manga: credit pages and
+// colour pages are not always in both.
+const SHIFT_KEY = 'horu-en-shift';
+export const enShift = (mangaKey: string): number => readJson<Record<string, number>>(SHIFT_KEY, {})[mangaKey] ?? 0;
+export function setEnShift(mangaKey: string, shift: number): void {
+  writeJson(SHIFT_KEY, { ...readJson<Record<string, number>>(SHIFT_KEY, {}), [mangaKey]: shift });
+}
 
 export const fileUrl = (chapterKey: string, file: string) => `${laptopBase() ?? ''}/api/manga/files/${chapterKey}/${file}`;
 export const thumbUrl = (mangaKey: string) => `${laptopBase() ?? ''}/api/manga/thumb/${mangaKey}`;

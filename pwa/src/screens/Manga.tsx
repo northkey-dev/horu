@@ -343,6 +343,9 @@ function MangaRow({ m, offlineCount }: { m: LibraryManga; offlineCount: number }
 function LocalDetail({ mangaKey, online }: { mangaKey: string; online: boolean }) {
   const manga = mangaApi.cachedLibrary().find((m) => m.key === mangaKey);
   const english = langOf(manga) === 'en';
+  // Manga of the other language: one of them can be this one's other edition
+  const editions = mangaApi.cachedLibrary().filter((m) => langOf(m) !== langOf(manga));
+  const [, setTick] = useState(0);
   const { data: serverChapters, refresh } = usePoll(() => (online ? mangaApi.chapters(mangaKey) : Promise.resolve(undefined)), 4000, [mangaKey, online]);
   const offline = offlineChaptersOf(mangaKey);
   const offlineKeys = new Set(offline.map((c) => c.key));
@@ -426,6 +429,16 @@ function LocalDetail({ mangaKey, online }: { mangaKey: string; online: boolean }
       await mangaApi.library();
       setMangaSide(lang);
       navigate('manga');
+    } catch (e) {
+      setError(describeError(e));
+    }
+  }
+
+  async function pairWith(other: string) {
+    try {
+      await mangaApi.setPair(mangaKey, other || null);
+      await mangaApi.library();
+      setTick((t) => t + 1);
     } catch (e) {
       setError(describeError(e));
     }
@@ -615,6 +628,29 @@ function LocalDetail({ mangaKey, online }: { mangaKey: string; online: boolean }
       )}
       {online && chapters.some((c) => c.status === 'cancelled') && (
         <p className="footnote">Deleted and cancelled chapters are not downloaded again by themselves. Tap Download to get one back.</p>
+      )}
+
+      {online && manga && editions.length > 0 && (
+        <>
+          <div className="group" style={{ marginTop: 32 }}>
+            <label className="field">
+              <span>{english ? 'Japanese edition' : 'English edition'}</span>
+              <select value={manga.pair ?? ''} onChange={(e) => void pairWith(e.target.value)}>
+                <option value="">None</option>
+                {editions.map((o) => (
+                  <option key={o.key} value={o.key}>
+                    {o.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <p className="footnote">
+            {english
+              ? 'Its Japanese chapters show this edition’s page with EN at the top of the reader.'
+              : 'EN at the top of the reader shows the English page of the chapter you read. Horu pairs the editions by itself when AniList knows both; set it here when it did not.'}
+          </p>
+        </>
       )}
 
       {online && manga && (

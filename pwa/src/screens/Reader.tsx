@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { navigate } from '../lib/hooks.ts';
-import { describeError, fileUrl, loadChapter, mangaApi, mangaLangByKey, mineLine, offlineChaptersOf, reportProgress, savedPage, type ChapterData } from '../lib/manga.ts';
+import { describeError, enShift, fileUrl, loadChapter, mangaApi, mangaLangByKey, mineLine, offlineChaptersOf, reportProgress, savedPage, setEnShift, type ChapterData } from '../lib/manga.ts';
 import { dragFrame, type Box, type Grip } from '../../../shared/frames.ts';
 import { looksChinese } from '../../../shared/lang.ts';
 import { TokenText, isWord } from '../components/TokenText.tsx';
@@ -15,7 +15,8 @@ import { chapterStamps } from '../lib/kanjiSkill.ts';
 
 // Full-screen manga reader. Japanese order: tap the LEFT side (or swipe right)
 // for the next page. English manga read the other way (tap right, swipe left) and are only pages: no bubbles,
-// no end-of-chapter screen. Tap a speech bubble to read it with the dictionary or translate it whole. Pinch or
+// no end-of-chapter screen. A Japanese manga with its English edition in the library has EN at the top: it shows
+// the English page of the same chapter in place of the Japanese one (‹ › move it when the editions differ by a page). Tap a speech bubble to read it with the dictionary or translate it whole. Pinch or
 // double-tap the middle to zoom in; the bubbles zoom with the page. A bubble read wrongly can get a new frame:
 // its corners and edges are dragged, the page can still be zoomed, and the laptop reads what the frame holds.
 
@@ -124,6 +125,11 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
   const [english, setEnglish] = useState(false);
   const englishRef = useRef(english);
   englishRef.current = english;
+  // The English edition next to a Japanese chapter: shown or not, the chapter found, and how far it is shifted
+  const [enOn, setEnOn] = useState(false);
+  const [en, setEn] = useState<{ chapterKey: string; key?: string; data?: ChapterData; note?: string }>();
+  const [enSrc, setEnSrc] = useState<string>();
+  const [shift, setShift] = useState(0);
 
   useEffect(() => {
     setData(undefined);
@@ -136,6 +142,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
       (d) => {
         const en = mangaLangByKey(d.mangaKey) === 'en';
         setEnglish(en);
+        setShift(enShift(d.mangaKey));
         setData(d);
         if (!en) {
           const snapshot = snapshotOf(d, chapterKey, bubbleEdits());
@@ -161,6 +168,63 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
       (e: Error) => setError(e.message),
     );
   }, [chapterKey]);
+
+  // The English edition of this manga, if it is paired (pairs.ts on the laptop)
+  const pairKey = data && !english ? mangaApi.cachedLibrary().find((m) => m.key === data.mangaKey)?.pair : undefined;
+
+  // EN on: find the matching English chapter (the laptop fetches it when it is not there yet) and wait for it.
+  useEffect(() => {
+    if (!enOn || (en?.chapterKey === chapterKey && (en.data || en.note?.startsWith('No ')))) return;
+    let alive = true;
+    void (async () => {
+      setEn({ chapterKey, note: 'Finding the English chapter…' });
+      for (let i = 0; alive && i < 300; i++) {
+        let r: Awaited<ReturnType<typeof mangaApi.pairChapter>>;
+        try {
+          r = await mangaApi.pairChapter(chapterKey);
+        } catch (e) {
+          if (alive) setEn({ chapterKey, note: e instanceof TypeError ? 'The English page needs the laptop.' : describeError(e) });
+          return;
+        }
+        if (!alive) return;
+        if (!r.chapter) return setEn({ chapterKey, note: r.missing ? `No English chapter with this number in ${r.manga?.title ?? 'the English edition'}.` : 'No English edition paired.' });
+        if (r.chapter.status === 'ready') {
+          const key = r.chapter.key;
+          const d = await loadChapter(key).catch(() => undefined);
+          if (alive) setEn(d ? { chapterKey, key, data: d } : { chapterKey, note: 'The English chapter could not be opened.' });
+          return;
+        }
+        if (r.chapter.status === 'error') return setEn({ chapterKey, note: r.chapter.error ?? 'The English chapter failed to load.' });
+        setEn({ chapterKey, note: `Loading the English chapter… ${r.chapter.pagesDone}/${r.chapter.pageCount || '?'}` });
+        await new Promise((res) => setTimeout(res, 2000));
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enOn, chapterKey]);
+
+  const enReady = enOn && en?.chapterKey === chapterKey && en.data && en.key ? { key: en.key, data: en.data } : undefined;
+  const enPage = enReady ? Math.min(enReady.data.pages.length - 1, Math.max(0, page + shift)) : 0;
+  useEffect(() => {
+    setEnSrc(undefined);
+    if (!enReady) return;
+    let alive = true;
+    void loadPage(fileUrl(enReady.key, enReady.data.pages[enPage].file)).then((src) => alive && setEnSrc(src));
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enReady?.key, enPage]);
+
+  function moveShift(delta: number) {
+    if (!data) return;
+    setShift((s) => {
+      setEnShift(data.mangaKey, s + delta);
+      return s + delta;
+    });
+  }
 
   const view = shown?.chapterKey === chapterKey ? shown : undefined;
   const current = view && data?.pages[view.page];
@@ -272,7 +336,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
   }, [data, ready]);
 
   const nextKey = neighbours.next?.key;
-  useEffect(() => keepOnly([chapterKey, nextKey ?? '']), [chapterKey, nextKey]);
+  useEffect(() => keepOnly([chapterKey, nextKey ?? '', en?.key ?? '']), [chapterKey, nextKey, en?.key]);
   const nearEnd = !!data && page >= data.pages.length - 4;
   useEffect(() => {
     if (!nearEnd || !nextKey) return;
@@ -520,9 +584,16 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
               {data?.name}
             </div>
           </div>
-          <span className="icon-btn" aria-hidden="true" />
+          {pairKey ? (
+            <button className={`en-btn${enOn ? ' on' : ''}`} aria-pressed={enOn} aria-label="Show the English page" onClick={() => setEnOn((v) => !v)}>
+              EN
+            </button>
+          ) : (
+            <span className="icon-btn" aria-hidden="true" />
+          )}
         </div>
       )}
+      {enOn && !enReady && en?.note && <div className="reader-note">{en.note}</div>}
       {chrome && chinese && (
         <div className="reader-note">
           This chapter is in Chinese, not Japanese – the source lists a Chinese edition as Japanese. Remove the manga and look for it in another source.
@@ -531,8 +602,8 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
 
       <div ref={stage} className="reader-page" onClick={onTap} onDoubleClick={onDoubleClick}>
         <div className="reader-zoom" style={{ transform: zoom.s > 1 ? `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.s})` : undefined }}>
-          {view && <img src={view.src} alt="" draggable={false} onLoad={measure} />}
-          {current && rect && !english && (
+          {view && <img src={enOn && enSrc ? enSrc : view.src} alt="" draggable={false} onLoad={measure} />}
+          {current && rect && !english && !(enOn && enSrc) && (
             <div className="blocks" style={{ left: rect.left, top: rect.top }}>
               {!frame && current.blocks.map((b, i) => (
                 <div
@@ -616,7 +687,21 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
             <Icon name="next" size={22} weight={2.1} /> Next
           </button>
           <div className="grow center page-count">
-            {page + 1} of {data.pages.length}
+            {enReady ? (
+              <span className="en-shift">
+                <button className="ghost small" aria-label="Earlier English page" onClick={() => moveShift(-1)}>
+                  ‹
+                </button>
+                EN {enPage + 1} of {enReady.data.pages.length}
+                <button className="ghost small" aria-label="Later English page" onClick={() => moveShift(1)}>
+                  ›
+                </button>
+              </span>
+            ) : (
+              <>
+                {page + 1} of {data.pages.length}
+              </>
+            )}
             {page === data.pages.length - 1 && !neighbours.next && <div className="muted" style={{ fontSize: 12, fontWeight: 400 }}>Last chapter on this phone</div>}
           </div>
           <button className="ghost" onClick={() => go(-1)} aria-label="Previous page">

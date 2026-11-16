@@ -30,6 +30,10 @@ export type ActiveManga = {
   chaptersRefreshedAt?: string;
   /** The source turned out to have Chinese text (see shared/lang.ts): no more chapters are prepared */
   notJapanese?: boolean;
+  /** AniList id of the title (0: not found), to pair the Japanese and the English edition (pairs.ts) */
+  anilistId?: number;
+  /** The other edition, set by hand: its key, or '' for none */
+  pairWith?: string;
 };
 
 /** paused: stopped by the user, pages so far kept; cancelled: stopped or deleted by the user, pages gone (not prepared again by itself) */
@@ -53,6 +57,8 @@ export type PreparedChapter = {
   rereading?: boolean;
   /** Pages read so far in that run; not set while it waits for its turn */
   rereadPages?: number;
+  /** Fetched to compare with the other edition, not by the reading window (which leaves it alone) */
+  compare?: boolean;
 };
 
 export type PageBlock = { box: [number, number, number, number]; vertical: boolean; text: string; readings?: Printed[]; /** The frame was set by hand: reading the chapter again keeps it */ framed?: boolean };

@@ -370,6 +370,11 @@ export async function syncWindows(): Promise<void> {
         });
         for (const c of lib.chaptersOf(manga.key)) {
           if (windowKeys.has(c.key)) continue;
+          // Fetched to compare with the other edition: kept for the days read chapters are kept.
+          if (c.compare) {
+            if (c.preparedAt && Date.now() - Date.parse(c.preparedAt) > keepMs) lib.removeChapter(c.key);
+            continue;
+          }
           // Waiting chapters the window no longer reaches (the setting was lowered) are dropped.
           if (c.status === 'queued') {
             dequeue(c.key);

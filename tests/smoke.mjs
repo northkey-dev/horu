@@ -451,6 +451,32 @@ try {
     await call('DELETE', `/api/manga/library/${manga.key}`);
   });
 
+  await check('editions: a Japanese chapter finds its English one by number', async () => {
+    const jpeg = new Uint8Array([255, 216, 255, 217]);
+    const add = (name, lang, files) =>
+      fetch(`${base}/api/manga/import`, { method: 'POST', headers: { 'X-Filename': encodeURIComponent(name), 'X-Lang': lang, 'Content-Type': 'application/octet-stream' }, body: zipSync(files) }).then((r) => r.json());
+    const ja = await add('テスト.cbz', 'ja', { '第1話/001.jpg': jpeg, '第2話/001.jpg': jpeg });
+    const en = await add('Test.cbz', 'en', { 'Chapter 1/001.jpg': jpeg, 'Chapter 2/001.jpg': jpeg });
+    try {
+      assert.equal((await call('PATCH', `/api/manga/library/${ja.key}`, { pair: ja.key })).status, 400, 'same language cannot pair');
+      await call('PATCH', `/api/manga/library/${ja.key}`, { pair: en.key });
+      const lib = (await call('GET', '/api/manga/library')).json;
+      assert.equal(lib.find((m) => m.key === ja.key).pair, en.key);
+      assert.equal(lib.find((m) => m.key === en.key).pair, ja.key);
+      const jaChapters = (await call('GET', `/api/manga/library/${ja.key}/chapters`)).json;
+      const enChapters = (await call('GET', `/api/manga/library/${en.key}/chapters`)).json;
+      const second = jaChapters.find((c) => c.name === '第2話');
+      const r = (await call('POST', `/api/manga/chapters/${second.key}/pair`)).json;
+      assert.equal(r.chapter.key, enChapters.find((c) => c.name === 'Chapter 2').key);
+      await call('PATCH', `/api/manga/library/${ja.key}`, { pair: null });
+      assert.equal((await call('GET', '/api/manga/library')).json.find((m) => m.key === en.key).pair, undefined);
+      assert.deepEqual((await call('POST', `/api/manga/chapters/${second.key}/pair`)).json, {});
+    } finally {
+      await call('DELETE', `/api/manga/library/${ja.key}`);
+      await call('DELETE', `/api/manga/library/${en.key}`);
+    }
+  });
+
   await check('voice and reading again: refused without anything to work on', async () => {
     assert.equal((await call('POST', '/api/tts', { text: ' ' })).status, 404);
     assert.equal((await call('POST', '/api/manga/chapters/nothing/reread')).status, 400);
