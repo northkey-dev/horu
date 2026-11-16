@@ -8,7 +8,8 @@ import * as store from '../store.ts';
 import { primingFor } from '../knownWords.ts';
 import * as lib from './library.ts';
 import * as suwa from './suwayomi.ts';
-import { enqueue, languageChanged, ocrAvailable, pauseManga, readFrame, rereadChapter, resumeChapter, scheduleSync, sortChapters, startMangaWorker as start, stopChapter } from './prepare.ts';
+import { enqueue, languageChanged, ocrAvailable, pauseManga, readFrame, readingOrder, rereadChapter, resumeChapter, scheduleSync, sortChapters, startMangaWorker as start, stopChapter } from './prepare.ts';
+import { pickChapters } from '../../../shared/sourceChapters.ts';
 import { importArchive } from './importer.ts';
 import { pairChapter, pairOf, resolveAnilistIds, setPair } from './pairs.ts';
 import { cropAround } from '../crop.ts';
@@ -120,7 +121,9 @@ export function mangaRouter(): express.Router {
       const key = `s${id}`;
       return {
         manga: { ...manga, key, active: lib.getManga(key) },
-        chapters: sortChapters(chapters).map((c) => ({ ...c, key: `c${c.id}`, prepared: lib.getChapter(`c${c.id}`) })),
+        chapters: readingOrder(chapters).map((c) => ({ ...c, key: `c${c.id}`, prepared: lib.getChapter(`c${c.id}`) })),
+        /** Whole volumes the source posts as one chapter: the same pages as the chapters, listed apart */
+        volumes: sortChapters(pickChapters(chapters).volumes).map((c) => ({ ...c, key: `c${c.id}`, prepared: lib.getChapter(`c${c.id}`) })),
       };
     }),
   );

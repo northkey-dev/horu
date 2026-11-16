@@ -228,6 +228,8 @@ Good to know:
 2. Tap a manga, then **Start reading**. It joins your library under *Reading*, and the laptop starts preparing the chapters.
 3. In the chapter list, tap a chapter marked **Prepare** to get it right away, or tap a ready chapter to read.
 
+**Doubled chapters and whole volumes.** Some sources list every chapter twice, an official translation and a fan one (MangaFire marks the official one with a tick). Horu shows one per chapter number and takes the official one. Some also post a whole volume as one big chapter (*Ch. 0 - Volume 8*, all pages of the volume): Horu lists those apart under **Whole volumes** at the bottom of the chapter list and never prepares them by itself; tap one if you want it.
+
 **Check the language.** Some sources list a Chinese edition as Japanese (Japanese text has roughly three kana for every kanji; Chinese has none). Once a chapter has been read by text recognition, Horu notices and shows a red notice in the reader and on the manga page, and stops preparing further chapters of it. Remove it and try another source, or search with the Japanese title.
 
 ### 3. Own files and servers

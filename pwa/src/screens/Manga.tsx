@@ -1016,6 +1016,7 @@ function RemoteDetail({ id }: { id: number }) {
       </>
     );
   const { manga, chapters } = data;
+  const volumes = data.volumes ?? [];
   return (
     <div>
       <Nav back="Back" />
@@ -1071,6 +1072,26 @@ function RemoteDetail({ id }: { id: number }) {
           );
         })}
       </div>
+      {volumes.length > 0 && (
+        <>
+          <h2>Whole volumes</h2>
+          <p className="footnote">
+            The source also posts {volumes.length === 1 ? 'a volume' : 'volumes'} as one big chapter: the same pages as the chapters above, all at once. Horu reads the
+            chapters one by one and leaves {volumes.length === 1 ? 'it' : 'these'} alone unless you tap one.
+          </p>
+          <div className="group">
+            {volumes.map((c, i) => (
+              <button key={c.id} className="list-item" disabled={busy === c.key} onClick={() => open(c, chapters.length + i)}>
+                <div className="grow">
+                  <div className="ellipsis">{c.name.replace(/^ch\.?\s*0+\s*[-–:]\s*/i, '')}</div>
+                  <div className="meta">{c.pageCount > 0 ? `${c.pageCount} pages` : 'whole volume'}</div>
+                </div>
+                {busy === c.key ? <span className="spinner" /> : <ChapterState status={c.prepared?.status} idle="Prepare" />}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

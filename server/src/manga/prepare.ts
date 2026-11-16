@@ -8,6 +8,7 @@ import { getSettings } from '../config.ts';
 import { looksChinese, looksJapanese } from '../../../shared/lang.ts';
 import { clampFrame, keepFramed } from '../../../shared/frames.ts';
 import { friendlyMangaError } from '../../../shared/mangaErrors.ts';
+import { keptFor, pickChapters } from '../../../shared/sourceChapters.ts';
 import { log } from '../log.ts';
 import { PyWorker } from '../pyworker.ts';
 import * as lib from './library.ts';
@@ -335,6 +336,9 @@ export function sortChapters<T extends { chapterNumber: number; sourceOrder: num
   return chapters.slice().sort((a, b) => a.chapterNumber - b.chapterNumber || a.sourceOrder - b.sourceOrder);
 }
 
+/** The chapters to read in order: one per number (the official one first), whole volumes left out (sourceChapters.ts). */
+export const readingOrder = (chapters: suwa.Chapter[]): suwa.Chapter[] => sortChapters(pickChapters(chapters).chapters);
+
 const REFRESH_MS = 6 * 3600_000;
 
 /** Fills the next-N window of every manga being read and removes old read chapters. */
@@ -349,9 +353,28 @@ export async function syncWindows(): Promise<void> {
         const refresh = !manga.chaptersRefreshedAt || Date.now() - Date.parse(manga.chaptersRefreshedAt) > REFRESH_MS;
         const { chapters } = await suwa.mangaWithChapters(Number(manga.key.slice(1)), refresh);
         if (refresh) lib.updateManga(manga.key, { chaptersRefreshedAt: new Date().toISOString() });
-        const sorted = sortChapters(chapters);
-        let current = manga.chapterKey ? sorted.findIndex((c) => `c${c.id}` === manga.chapterKey) : -1;
+        const sorted = readingOrder(chapters);
+        // Your place may be in a chapter now left out as a duplicate: the kept one with its number takes over.
+        const placeId = manga.chapterKey?.startsWith('c') ? Number(manga.chapterKey.slice(1)) : undefined;
+        const place = placeId !== undefined ? keptFor(chapters, sorted, placeId) : undefined;
+        let current = place ? sorted.indexOf(place) : -1;
         if (current < 0) current = Math.max(0, sorted.findIndex((c) => !c.isRead));
+        // Prepared chapters follow the order of this list (an older Horu counted the duplicates and volumes too).
+        // A left-out duplicate that is not ready goes; a ready one stays next to its kept twin. Whole volumes go last.
+        const volumes = pickChapters(chapters).volumes;
+        for (const c of lib.chaptersOf(manga.key)) {
+          const id = Number(c.key.slice(1));
+          const kept = keptFor(chapters, sorted, id);
+          const twin = kept && `c${kept.id}` !== c.key;
+          if (twin && c.status !== 'ready') {
+            dequeue(c.key);
+            lib.removeChapter(c.key);
+            continue;
+          }
+          const volume = volumes.findIndex((v) => v.id === id);
+          const order = kept ? sorted.indexOf(kept) - (twin ? 0.5 : 0) : volume >= 0 ? sorted.length + volume : undefined;
+          if (order !== undefined && order !== c.order) lib.updateChapter(c.key, { order });
+        }
         const windowKeys = new Set<string>();
         // Once the current chapter is read to its end, the window moves on, so with "1" the next chapter is
         // prepared when you finish this one, not before.

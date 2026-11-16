@@ -2,6 +2,10 @@
 
 Release numbers follow `package.json`. The app, the laptop service and the Chrome extension share one number.
 
+## 1.5.1 (2026-11-16)
+
+Manga sources: **one entry per chapter**: sources that list a chapter twice (MangaFire: official with a tick, and a fan translation) show the official one only; a place in a left-out twin moves to the kept one, and twins not downloaded leave the chapter list. **Whole volumes** posted as one chapter (*Ch. 0 - Volume 8*) are listed apart and no longer taken for the first chapter by the reading window.
+
 ## 1.5.0 (2026-11-16)
 
 **EN in the Japanese manga reader:** with the English edition of the manga in the library, EN at the top shows the English page of the chapter you read in place of the Japanese one.

@@ -2,7 +2,7 @@ import { matchTitles } from '../../../shared/anilist.ts';
 import { chapterNumbers, cleanTitle, sameChapter } from '../../../shared/chapterMatch.ts';
 import { log } from '../log.ts';
 import * as lib from './library.ts';
-import { enqueue, sortChapters } from './prepare.ts';
+import { enqueue, readingOrder } from './prepare.ts';
 import * as suwa from './suwayomi.ts';
 
 // The Japanese and the English edition of the same manga, side by side: the reader shows the English page of a
@@ -80,7 +80,7 @@ export async function pairChapter(chapterKey: string): Promise<PairChapter> {
 
   if (!p.key.startsWith('s')) return { manga, missing: true };
   const { chapters } = await suwa.mangaWithChapters(Number(p.key.slice(1)), false);
-  const sorted = sortChapters(chapters);
+  const sorted = readingOrder(chapters);
   const hit = sorted.find((rc) => sameChapter(want, rc.chapterNumber > 0 ? { chapter: rc.chapterNumber } : chapterNumbers(rc.name)));
   if (!hit) return { manga, missing: true };
   const key = `c${hit.id}`;

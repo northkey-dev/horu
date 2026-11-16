@@ -134,7 +134,7 @@ export const mangaApi = {
   search: (source: string, q: string, page = 1) =>
     get<{ mangas: RemoteManga[]; hasNextPage: boolean }>(`/api/manga/search?source=${source}&q=${encodeURIComponent(q)}&page=${page}`),
   remote: (id: number, refresh = false) =>
-    get<{ manga: RemoteManga & { key: string; description: string | null; author: string | null; active?: LibraryManga }; chapters: RemoteChapter[] }>(
+    get<{ manga: RemoteManga & { key: string; description: string | null; author: string | null; active?: LibraryManga }; chapters: RemoteChapter[]; volumes?: RemoteChapter[] }>(
       `/api/manga/remote/${id}${refresh ? '?refresh=1' : ''}`,
     ),
   library: async () => {
