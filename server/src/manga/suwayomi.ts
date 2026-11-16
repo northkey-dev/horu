@@ -177,13 +177,13 @@ export async function searchSource(sourceId: string, query: string, page = 1): P
 export async function mangaWithChapters(
   mangaId: number,
   refresh: boolean,
-): Promise<{ manga: MangaSummary & { description: string | null; author: string | null; source: { displayName: string } | null }; chapters: Chapter[] }> {
+): Promise<{ manga: MangaSummary & { description: string | null; author: string | null; source: { displayName: string; lang?: string } | null }; chapters: Chapter[] }> {
   if (refresh) {
     const data = await gql<{
-      fetchMangaAndChapters: { manga: MangaSummary & { description: string | null; author: string | null; source: { displayName: string } | null }; chapters: Chapter[] };
+      fetchMangaAndChapters: { manga: MangaSummary & { description: string | null; author: string | null; source: { displayName: string; lang?: string } | null }; chapters: Chapter[] };
     }>(
       `mutation($id: Int!) { fetchMangaAndChapters(input: { id: $id, fetchManga: true, fetchChapters: true }) {
-        manga { id title thumbnailUrl inLibrary description author source { displayName } }
+        manga { id title thumbnailUrl inLibrary description author source { displayName lang } }
         chapters { id name chapterNumber sourceOrder isRead pageCount uploadDate scanlator }
       } }`,
       { id: mangaId },
@@ -191,9 +191,9 @@ export async function mangaWithChapters(
     return data.fetchMangaAndChapters;
   }
   const data = await gql<{
-    manga: MangaSummary & { description: string | null; author: string | null; source: { displayName: string } | null; chapters: { nodes: Chapter[] } };
+    manga: MangaSummary & { description: string | null; author: string | null; source: { displayName: string; lang?: string } | null; chapters: { nodes: Chapter[] } };
   }>(
-    `query($id: Int!) { manga(id: $id) { id title thumbnailUrl inLibrary description author source { displayName }
+    `query($id: Int!) { manga(id: $id) { id title thumbnailUrl inLibrary description author source { displayName lang }
       chapters { nodes { id name chapterNumber sourceOrder isRead pageCount uploadDate scanlator } } } }`,
     { id: mangaId },
   );

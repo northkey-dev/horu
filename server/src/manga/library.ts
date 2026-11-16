@@ -6,10 +6,17 @@ import type { Printed } from '../../../shared/readings.ts';
 
 // Horu's own manga state: which manga are being read, reading progress and the
 // chapters prepared (downloaded + OCR'd) for offline reading on the phone.
+// Japanese manga are for learning (text recognition, word lists, stats); English ones are only read: their
+// chapters are ready once the pages are there, and they stay out of XP, streaks and recommendations.
 // Keys: manga "s<id>" (Suwayomi) or "i<id>" (import); chapters "c<id>" (Suwayomi) or "i<id>-<n>" (import).
+
+export type MangaLang = 'ja' | 'en';
+export const MANGA_LANGS: MangaLang[] = ['ja', 'en'];
 
 export type ActiveManga = {
   key: string;
+  /** Language of the edition; not set = Japanese (every manga before English ones came) */
+  lang?: MangaLang;
   title: string;
   source: string;
   addedAt: string;
@@ -99,6 +106,11 @@ export function removeManga(key: string): void {
   fs.rmSync(thumbPath(key), { force: true });
   save();
 }
+
+export const langOf = (mangaKey: string): MangaLang => getManga(mangaKey)?.lang ?? 'ja';
+
+/** Chapters of Japanese manga: what counts for learning (XP, streaks, achievements). */
+export const japaneseChapters = (): PreparedChapter[] => db.chapters.filter((c) => langOf(c.mangaKey) === 'ja');
 
 export function chaptersOf(mangaKey: string): PreparedChapter[] {
   return db.chapters.filter((c) => c.mangaKey === mangaKey).sort((a, b) => a.order - b.order);

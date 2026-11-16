@@ -8,7 +8,7 @@ import * as store from '../store.ts';
 import { primingFor } from '../knownWords.ts';
 import * as lib from './library.ts';
 import * as suwa from './suwayomi.ts';
-import { enqueue, ocrAvailable, pauseManga, readFrame, rereadChapter, resumeChapter, scheduleSync, sortChapters, startMangaWorker as start, stopChapter } from './prepare.ts';
+import { enqueue, languageChanged, ocrAvailable, pauseManga, readFrame, rereadChapter, resumeChapter, scheduleSync, sortChapters, startMangaWorker as start, stopChapter } from './prepare.ts';
 import { importArchive } from './importer.ts';
 import { cropAround } from '../crop.ts';
 import { downloadBook, searchServer, serverBooks, serverName } from './servers.ts';
@@ -31,6 +31,18 @@ const h =
   };
 
 const param = (req: Request, name: string) => String(req.params[name]);
+
+/** The language asked for: English or (anything else) Japanese. */
+const langParam = (x: unknown): lib.MangaLang => (x === 'en' ? 'en' : 'ja');
+/** Suwayomi's language codes: "en", "ja", "all" (multi-language sources count for both). */
+const sourceFits = (sourceLang: string, lang: lib.MangaLang) => sourceLang === lang || sourceLang === 'all';
+
+/** The limit of manga read at once counts each language on its own. */
+function checkActive(key: string, lang: lib.MangaLang): void {
+  const max = getSettings().mangaMaxActive;
+  const active = lib.listManga().filter((m) => m.status === 'reading' && m.key !== key && (m.lang ?? 'ja') === lang).length;
+  if (active >= max) throw new Error(`You already read ${active} ${lang === 'en' ? 'English' : 'Japanese'} manga. Pause one first (max ${max}).`);
+}
 
 function imageType(file: string): string {
   const head = Buffer.alloc(12);
@@ -80,8 +92,8 @@ export function mangaRouter(): express.Router {
   r.get(
     '/extensions',
     h(async (req) => {
-      const lang = String(req.query.lang ?? 'ja');
-      return (await suwa.listExtensions()).filter((e) => (getSettings().showAdultSources || !e.isNsfw) && (e.lang === lang || (lang === 'ja' && e.lang === 'all')));
+      const lang = langParam(req.query.lang);
+      return (await suwa.listExtensions()).filter((e) => (getSettings().showAdultSources || !e.isNsfw) && sourceFits(e.lang, lang));
     }),
   );
   r.post(
@@ -91,7 +103,7 @@ export function mangaRouter(): express.Router {
       return { ok: true };
     }),
   );
-  r.get('/sources', h(async () => (await suwa.listSources()).filter((s) => s.lang === 'ja' || s.lang === 'all')));
+  r.get('/sources', h(async (req) => (await suwa.listSources()).filter((s) => sourceFits(s.lang, langParam(req.query.lang)))));
   r.get('/search', h((req) => suwa.searchSource(String(req.query.source), String(req.query.q ?? ''), Number(req.query.page ?? 1))));
 
   r.get(
@@ -124,9 +136,10 @@ export function mangaRouter(): express.Router {
     h(async (req) => {
       const id = Number(req.body?.mangaId);
       const key = `s${id}`;
-      const active = lib.listManga().filter((m) => m.status === 'reading' && m.key !== key).length;
-      if (active >= getSettings().mangaMaxActive) throw new Error(`You already read ${active} manga. Pause one first (max ${getSettings().mangaMaxActive}).`);
       const { manga } = await suwa.mangaWithChapters(id, true);
+      // The source says the language; a multi-language source ("all") follows the side it was added from.
+      const lang: lib.MangaLang = lib.getManga(key)?.lang ?? (manga.source?.lang === 'en' ? 'en' : manga.source?.lang === 'all' ? langParam(req.body?.lang) : 'ja');
+      checkActive(key, lang);
       await suwa.setInLibrary(id, true).catch(() => {});
       lib.upsertManga({
         key,
@@ -138,6 +151,7 @@ export function mangaRouter(): express.Router {
         hasThumb: await saveThumb(key, manga.thumbnailUrl),
         chapterKey: req.body?.chapterKey ?? lib.getManga(key)?.chapterKey,
         chaptersRefreshedAt: new Date().toISOString(),
+        lang: lang === 'en' ? 'en' : undefined,
       });
       start();
       scheduleSync(100);
@@ -149,12 +163,18 @@ export function mangaRouter(): express.Router {
     '/library/:key',
     h((req) => {
       const key = param(req, 'key');
+      const manga = lib.getManga(key);
+      if (!manga) throw new Error('Unknown manga');
       const status = req.body?.status as 'reading' | 'paused' | undefined;
-      if (status === 'reading') {
-        const active = lib.listManga().filter((m) => m.status === 'reading' && m.key !== key).length;
-        if (active >= getSettings().mangaMaxActive) throw new Error(`Max ${getSettings().mangaMaxActive} manga at a time.`);
-      }
+      // Moved to the other side of the Manga screen (Japanese / English)
+      const lang = req.body?.lang === undefined ? undefined : langParam(req.body.lang);
+      const newLang = lang ?? manga.lang ?? 'ja';
+      if (status === 'reading' || (lang && manga.status === 'reading')) checkActive(key, newLang);
       if (status) lib.updateManga(key, { status });
+      if (lang && lang !== (manga.lang ?? 'ja')) {
+        lib.updateManga(key, { lang: lang === 'en' ? 'en' : undefined, notJapanese: undefined });
+        languageChanged(key);
+      }
       scheduleSync(100);
       return libraryView().find((m) => m.key === key);
     }),
@@ -395,7 +415,7 @@ export function mangaRouter(): express.Router {
     express.raw({ type: () => true, limit: '500mb' }),
     h((req) => {
       const fileName = decodeURIComponent(String(req.headers['x-filename'] ?? 'import.cbz'));
-      const key = importArchive(new Uint8Array(req.body as Buffer), fileName);
+      const key = importArchive(new Uint8Array(req.body as Buffer), fileName, { lang: langParam(req.headers['x-lang']) });
       return libraryView().find((m) => m.key === key);
     }),
   );
@@ -407,9 +427,9 @@ export function mangaRouter(): express.Router {
   r.post(
     '/server/import',
     h(async (req) => {
-      const { seriesId, seriesName, bookId, bookName } = req.body as { seriesId: string; seriesName: string; bookId: string; bookName: string };
+      const { seriesId, seriesName, bookId, bookName, lang } = req.body as { seriesId: string; seriesName: string; bookId: string; bookName: string; lang?: string };
       const zip = await downloadBook(bookId);
-      const key = importArchive(zip, `${bookName}.cbz`, { mangaKey: `k${seriesId.replace(/[^\w-]/g, '')}`, mangaTitle: seriesName, chapterName: bookName, source: serverName() });
+      const key = importArchive(zip, `${bookName}.cbz`, { mangaKey: `k${seriesId.replace(/[^\w-]/g, '')}`, mangaTitle: seriesName, chapterName: bookName, source: serverName(), lang: langParam(lang) });
       return libraryView().find((m) => m.key === key);
     }),
   );

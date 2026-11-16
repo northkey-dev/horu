@@ -8,7 +8,7 @@ import { importWords, knownSet, knownSummary, primingFor, refreshFromAnki, refre
 import { jpdbKnown, wanikaniKnown } from '../../shared/knownSources.ts';
 import { parseWordList, type WordStatus } from '../../shared/words.ts';
 import { getSettings, updateSettings } from './config.ts';
-import { allChapters, listManga } from './manga/library.ts';
+import { japaneseChapters, listManga } from './manga/library.ts';
 import { log } from './log.ts';
 import * as store from './store.ts';
 import type { Cue } from '../../shared/types.ts';
@@ -156,8 +156,8 @@ export function insightsRouter(): express.Router {
         inbox: store.inboxMoments().length,
         streak,
         episodes: store.allSessions().length,
-        chaptersRead: allChapters().filter((c) => c.readAt).length,
-        mangaReading: listManga().filter((m) => m.status === 'reading').length,
+        chaptersRead: japaneseChapters().filter((c) => c.readAt).length,
+        mangaReading: listManga().filter((m) => m.status === 'reading' && (m.lang ?? 'ja') === 'ja').length,
         knownWords: (await knownSet()).size,
         days,
         titles: [...byTitle.values()].sort((a, b) => b.cards - a.cards || b.marked - a.marked).slice(0, 10),

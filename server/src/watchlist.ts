@@ -41,7 +41,10 @@ export function watchHistory(): WatchHistory {
       had.anilistId ??= s.anilistId;
     } else anime.set(key, { title: s.title, anilistId: s.anilistId, seconds, at: s.createdAt });
   }
-  const manga = listManga().map((m) => ({ title: m.title, at: m.lastReadAt ?? m.addedAt }));
+  // Japanese manga only: English ones are kept apart from the learning side.
+  const manga = listManga()
+    .filter((m) => (m.lang ?? 'ja') === 'ja')
+    .map((m) => ({ title: m.title, at: m.lastReadAt ?? m.addedAt }));
   const byTime = <T extends { at: string }>(a: T, b: T) => b.at.localeCompare(a.at);
   return { anime: [...anime.values()].sort(byTime), manga: manga.sort(byTime) };
 }

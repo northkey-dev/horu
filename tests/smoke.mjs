@@ -424,6 +424,33 @@ try {
     }
   });
 
+  await check('English manga: ready without text recognition, kept out of the stats', async () => {
+    const jpeg = new Uint8Array([255, 216, 255, 217]);
+    const zip = zipSync({ 'Chapter 1/001.jpg': jpeg, 'Chapter 1/002.jpg': jpeg });
+    const manga = await fetch(`${base}/api/manga/import`, { method: 'POST', headers: { 'X-Filename': 'english.cbz', 'X-Lang': 'en', 'Content-Type': 'application/octet-stream' }, body: zip }).then((r) => r.json());
+    assert.equal(manga.lang, 'en');
+    let chapters = [];
+    for (let i = 0; i < 50 && chapters[0]?.status !== 'ready'; i++) {
+      chapters = (await call('GET', `/api/manga/library/${manga.key}/chapters`)).json;
+      if (chapters[0]?.status !== 'ready') await new Promise((r) => setTimeout(r, 100));
+    }
+    assert.equal(chapters[0]?.status, 'ready', JSON.stringify(chapters[0]));
+    const { data } = (await call('GET', `/api/manga/chapters/${chapters[0].key}`)).json;
+    assert.equal(data.pages.length, 2);
+    assert.ok(data.pages.every((p) => p.blocks.length === 0));
+    assert.equal((await call('POST', `/api/manga/chapters/${chapters[0].key}/reread`)).status, 400);
+    // Read to the end: no XP, no chapter in the stats
+    await call('POST', '/api/manga/progress', { mangaKey: manga.key, chapterKey: chapters[0].key, page: 1, finished: true });
+    const before = (await call('GET', '/api/analytics')).json.totals.chapters;
+    // Moved to Japanese, the same read chapter counts
+    const moved = (await call('PATCH', `/api/manga/library/${manga.key}`, { lang: 'ja' })).json;
+    assert.equal(moved.lang, undefined);
+    assert.equal((await call('GET', '/api/analytics')).json.totals.chapters, before + 1);
+    // Sources asked for by language
+    assert.equal((await call('GET', '/api/manga/library')).json.find((m) => m.key === manga.key).lang, undefined);
+    await call('DELETE', `/api/manga/library/${manga.key}`);
+  });
+
   await check('voice and reading again: refused without anything to work on', async () => {
     assert.equal((await call('POST', '/api/tts', { text: ' ' })).status, 404);
     assert.equal((await call('POST', '/api/manga/chapters/nothing/reread')).status, 400);

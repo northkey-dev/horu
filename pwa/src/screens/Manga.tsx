@@ -7,14 +7,18 @@ import {
   offlineChaptersOf,
   canCache,
   describeError,
+  langOf,
+  mangaSide,
   offlineIndex,
   pendingCount,
   removeOfflineChapter,
   saveChapterOffline,
   remoteThumbUrl,
+  setMangaSide,
   syncOffline,
   thumbUrl,
   type LibraryManga,
+  type MangaLang,
   type RemoteChapter,
   type Source,
   type SyncProgress,
@@ -45,7 +49,7 @@ function ChapterState({ status, offline, idle, rereading }: { status?: string; o
 export function Manga({ route, online }: { route: string[]; online: boolean }) {
   const [view, arg] = route;
   if (view === 'read' && arg) return <Reader chapterKey={arg} />;
-  if (view === 'browse') return <Browse initial={arg ? decodeURIComponent(arg) : ''} />;
+  if (view === 'browse') return <Browse key={arg ?? ''} initial={arg ? decodeURIComponent(arg) : ''} />;
   if (view === 'server') return <ServerBrowse />;
   if (view === 'remote' && arg) return <RemoteDetail id={Number(arg)} />;
   if (view === 'm' && arg) return <LocalDetail mangaKey={arg} online={online} />;
@@ -64,8 +68,20 @@ function Cover({ src, title, big }: { src?: string; title: string; big?: boolean
 
 // ---------------------------------------------------------------- home
 
+const SIDES: [MangaLang, string][] = [
+  ['ja', '日本語'],
+  ['en', 'English'],
+];
+
 function Home({ online }: { online: boolean }) {
   const [library, setLibrary] = useState<LibraryManga[]>(() => mangaApi.cachedLibrary());
+  // Japanese (to learn from) or English (only read): everything below belongs to the side chosen.
+  const [side, setSideState] = useState<MangaLang>(mangaSide);
+  const english = side === 'en';
+  function setSide(lang: MangaLang) {
+    setSideState(lang);
+    setMangaSide(lang);
+  }
   const [sync, setSync] = useState<SyncProgress>();
   const syncAbort = useRef<AbortController>();
   const [storage, setStorage] = useState<{ bytes: number; chapters: number; readBytes: number; readChapters: number; phone?: number }>();
@@ -135,8 +151,8 @@ function Home({ online }: { online: boolean }) {
   async function importFile(file: File) {
     setMessage(`Importing ${file.name}…`);
     try {
-      await mangaApi.importFile(file);
-      setMessage('Imported. Text recognition runs on the laptop now.');
+      await mangaApi.importFile(file, side);
+      setMessage(english ? 'Imported into English. Ready in a moment.' : 'Imported. Text recognition runs on the laptop now.');
       void refresh();
     } catch (e) {
       setError(describeError(e));
@@ -146,11 +162,13 @@ function Home({ online }: { online: boolean }) {
 
   const offline = offlineIndex();
   const pending = pendingCount();
+  const mine = library.filter((m) => langOf(m) === side);
+  const other = library.length - mine.length;
   // Where you stopped last, one tap away
-  const last = library.filter((m) => m.chapterKey && m.lastReadAt).sort((a, b) => Date.parse(b.lastReadAt!) - Date.parse(a.lastReadAt!))[0];
+  const last = mine.filter((m) => m.chapterKey && m.lastReadAt).sort((a, b) => Date.parse(b.lastReadAt!) - Date.parse(a.lastReadAt!))[0];
   const lastChapter = last && offlineChaptersOf(last.key).find((c) => c.key === last.chapterKey);
-  const reading = library.filter((m) => m.status === 'reading');
-  const paused = library.filter((m) => m.status === 'paused');
+  const reading = mine.filter((m) => m.status === 'reading');
+  const paused = mine.filter((m) => m.status === 'paused');
 
   return (
     <div>
@@ -165,19 +183,72 @@ function Home({ online }: { online: boolean }) {
         )}
       </Nav>
       <h1>Manga</h1>
+      <div className="segmented manga-side" role="radiogroup" aria-label="Language of the manga">
+        {SIDES.map(([lang, label]) => (
+          <button key={lang} role="radio" aria-checked={side === lang} className={`${side === lang ? 'on' : ''}${lang === 'ja' ? ' jp' : ''}`} onClick={() => setSide(lang)}>
+            {label}
+          </button>
+        ))}
+      </div>
       {error && <div className="banner error">{error}</div>}
       {message && <div className="banner info">{message}</div>}
       {pending > 0 && <div className="banner">{pending} offline action(s) waiting for the laptop.</div>}
 
       {last && (
         <button className="primary block continue" onClick={() => navigate(`manga/read/${last.chapterKey}`)}>
-          <span className="jp ellipsis">Continue: {last.title}</span>
+          <span className={`ellipsis${english ? '' : ' jp'}`}>Continue: {last.title}</span>
           <span className="small">
             {lastChapter ? `${lastChapter.name} · ` : ''}page {(last.page ?? 0) + 1}
           </span>
         </button>
       )}
 
+      {!mine.length && (
+        <div className="empty">
+          <span className={`glyph${english ? '' : ' jp'}`} aria-hidden="true">
+            {english ? 'EN' : '本'}
+          </span>
+          <b>{english ? 'No English manga yet' : 'No manga yet'}</b>
+          <p>
+            {!online
+              ? 'Connect to the laptop to add manga.'
+              : english
+                ? 'Tap + to find one in an English source, or import a .cbz file below. English manga are only read: no text recognition, and they do not count for XP or your streak.'
+                : 'Tap + to find a manga, pick a Japanese source and start reading.'}
+          </p>
+          {!!other && <p className="small muted">{other} manga on the {english ? '日本語' : 'English'} side.</p>}
+        </div>
+      )}
+
+      {reading.length > 0 && <h2>Reading</h2>}
+      {reading.length > 0 && (
+        <div className="group">
+          {reading.map((m) => (
+            <MangaRow key={m.key} m={m} offlineCount={offlineChaptersOf(m.key).length} />
+          ))}
+        </div>
+      )}
+      {paused.length > 0 && <h2>Paused</h2>}
+      {paused.length > 0 && (
+        <div className="group">
+          {paused.map((m) => (
+            <MangaRow key={m.key} m={m} offlineCount={offlineChaptersOf(m.key).length} />
+          ))}
+        </div>
+      )}
+
+      {online && (
+        <>
+          <div className="group" style={{ marginTop: 32 }}>
+            <button className="list-item action-row" onClick={() => importRef.current?.click()}>
+              {english ? 'Import an English .cbz or .zip file' : 'Import a .cbz or .zip file'}
+            </button>
+          </div>
+          <input ref={importRef} type="file" accept=".cbz,.zip" hidden onChange={(e) => e.target.files?.[0] && importFile(e.target.files[0])} />
+        </>
+      )}
+
+      {online && <h2>Offline and storage</h2>}
       {online && (
         <div className="group">
           <div className="cell">
@@ -238,43 +309,6 @@ function Home({ online }: { online: boolean }) {
         </p>
       )}
 
-      {!library.length && (
-        <div className="empty">
-          <span className="glyph jp" aria-hidden="true">
-            本
-          </span>
-          <b>No manga yet</b>
-          <p>{online ? 'Tap + to find a manga, pick a Japanese source and start reading.' : 'Connect to the laptop to add manga.'}</p>
-        </div>
-      )}
-
-      {reading.length > 0 && <h2>Reading</h2>}
-      {reading.length > 0 && (
-        <div className="group">
-          {reading.map((m) => (
-            <MangaRow key={m.key} m={m} offlineCount={offlineChaptersOf(m.key).length} />
-          ))}
-        </div>
-      )}
-      {paused.length > 0 && <h2>Paused</h2>}
-      {paused.length > 0 && (
-        <div className="group">
-          {paused.map((m) => (
-            <MangaRow key={m.key} m={m} offlineCount={offlineChaptersOf(m.key).length} />
-          ))}
-        </div>
-      )}
-
-      {online && (
-        <>
-          <div className="group" style={{ marginTop: 32 }}>
-            <button className="list-item action-row" onClick={() => importRef.current?.click()}>
-              Import a .cbz or .zip file
-            </button>
-          </div>
-          <input ref={importRef} type="file" accept=".cbz,.zip" hidden onChange={(e) => e.target.files?.[0] && importFile(e.target.files[0])} />
-        </>
-      )}
     </div>
   );
 }
@@ -286,7 +320,7 @@ function MangaRow({ m, offlineCount }: { m: LibraryManga; offlineCount: number }
     <button className="list-item manga-row" onClick={() => navigate(`manga/m/${m.key}`)}>
       <Cover src={m.hasThumb ? thumbUrl(m.key) : undefined} title={m.title} />
       <div className="grow" style={{ paddingTop: 2 }}>
-        <div className="title jp clamp">{m.title}</div>
+        <div className={`title clamp${langOf(m) === 'ja' ? ' jp' : ''}`}>{m.title}</div>
         <div className="sub ellipsis">{current ? `${current.name}${m.page ? ` · p. ${m.page + 1}` : ''}` : m.source}</div>
         <div className="meta meta-row" style={{ marginTop: 4 }}>
           <span className={offlineCount ? 'label-ok' : ''}>{offlineCount} on phone</span>
@@ -308,6 +342,7 @@ function MangaRow({ m, offlineCount }: { m: LibraryManga; offlineCount: number }
 
 function LocalDetail({ mangaKey, online }: { mangaKey: string; online: boolean }) {
   const manga = mangaApi.cachedLibrary().find((m) => m.key === mangaKey);
+  const english = langOf(manga) === 'en';
   const { data: serverChapters, refresh } = usePoll(() => (online ? mangaApi.chapters(mangaKey) : Promise.resolve(undefined)), 4000, [mangaKey, online]);
   const offline = offlineChaptersOf(mangaKey);
   const offlineKeys = new Set(offline.map((c) => c.key));
@@ -379,6 +414,23 @@ function LocalDetail({ mangaKey, online }: { mangaKey: string; online: boolean }
   const current = sorted.find((c) => c.key === manga?.chapterKey);
   const next = current && sorted.find((c) => c.order > current.order && c.status === 'ready');
 
+  /** Moves the manga to the other side: English (only read) or Japanese (text recognition runs for its chapters). */
+  async function moveTo(lang: MangaLang) {
+    const ask =
+      lang === 'en'
+        ? `Move “${manga?.title}” to English? It is then only read: no word lists, and it no longer counts for XP and your streak.`
+        : `Move “${manga?.title}” to 日本語? The laptop reads the text of its chapters (about eight seconds per page).`;
+    if (!confirm(ask)) return;
+    try {
+      await mangaApi.setLang(mangaKey, lang);
+      await mangaApi.library();
+      setMangaSide(lang);
+      navigate('manga');
+    } catch (e) {
+      setError(describeError(e));
+    }
+  }
+
   async function setStatus(status: 'reading' | 'paused') {
     try {
       await mangaApi.setStatus(mangaKey, status);
@@ -395,12 +447,15 @@ function LocalDetail({ mangaKey, online }: { mangaKey: string; online: boolean }
       <div className="manga-head">
         <Cover src={manga?.hasThumb ? thumbUrl(mangaKey) : undefined} title={manga?.title ?? ''} big />
         <div className="grow">
-          <h1 className="jp">{manga?.title ?? 'Manga'}</h1>
-          <div className="muted small">{manga?.source}</div>
+          <h1 className={english ? '' : 'jp'}>{manga?.title ?? 'Manga'}</h1>
+          <div className="muted small">
+            {manga?.source}
+            {english && ' · English'}
+          </div>
         </div>
       </div>
       {error && <div className="banner error">{error}</div>}
-      {manga?.notJapanese && (
+      {manga?.notJapanese && !english && (
         <div className="banner error">
           This edition is in Chinese, not Japanese: {manga.source} lists it as Japanese anyway. No more chapters are prepared. Remove it and look for the manga in another source.
         </div>
@@ -412,7 +467,7 @@ function LocalDetail({ mangaKey, online }: { mangaKey: string; online: boolean }
         </button>
       )}
 
-      {online && current?.status === 'ready' && (
+      {online && !english && current?.status === 'ready' && (
         <WordPrep
           key={current.key}
           load={() => mangaApi.chapterInsight(current.key)}
@@ -422,7 +477,7 @@ function LocalDetail({ mangaKey, online }: { mangaKey: string; online: boolean }
           enabled
         />
       )}
-      {online && next && (
+      {online && !english && next && (
         <WordPrep
           key={next.key}
           load={() => mangaApi.chapterInsight(next.key)}
@@ -452,14 +507,14 @@ function LocalDetail({ mangaKey, online }: { mangaKey: string; online: boolean }
           </div>
         </div>
       )}
-      {editing && (
+      {editing && !english && (
         <div className="group">
           <button className="list-item action-row" disabled={acting === 'reread'} onClick={() => act('reread', () => mangaApi.rereadManga(mangaKey))}>
             <span className="grow">Read the text of all chapters again</span>
           </button>
         </div>
       )}
-      {editing && <p className="footnote">For chapters prepared by an older Horu. About eight seconds per page on the laptop; you can keep reading meanwhile. Corrections you made by hand stay.</p>}
+      {editing && !english && <p className="footnote">For chapters prepared by an older Horu. About eight seconds per page on the laptop; you can keep reading meanwhile. Corrections you made by hand stay.</p>}
       {online && active + paused > 1 && (
         <div className="group">
           <div className="cell">
@@ -525,9 +580,11 @@ function LocalDetail({ mangaKey, online }: { mangaKey: string; online: boolean }
                         Off phone
                       </button>
                     )}
-                    <button className="small" disabled={c.rereading} onClick={() => act(c.key, () => mangaApi.rereadChapter(c.key))}>
-                      {c.rereading ? 'Reading again' : 'Read text again'}
-                    </button>
+                    {!english && (
+                      <button className="small" disabled={c.rereading} onClick={() => act(c.key, () => mangaApi.rereadChapter(c.key))}>
+                        {c.rereading ? 'Reading again' : 'Read text again'}
+                      </button>
+                    )}
                     <button
                       className="small danger"
                       onClick={() => confirm(`Delete “${c.name}”? Its pages are removed from the laptop and this phone.`) && act(c.key, () => mangaApi.stopChapter(c.key, 'cancel'))}
@@ -569,6 +626,9 @@ function LocalDetail({ mangaKey, online }: { mangaKey: string; online: boolean }
           )}
           <button className="list-item action-row" onClick={() => setStatus(manga.status === 'reading' ? 'paused' : 'reading')}>
             {manga.status === 'reading' ? 'Mark as paused' : 'Mark as reading'}
+          </button>
+          <button className="list-item action-row" onClick={() => void moveTo(english ? 'ja' : 'en')}>
+            {english ? 'Move to 日本語 (Japanese)' : 'Move to English'}
           </button>
           <button
             className="list-item action-row danger"
@@ -616,7 +676,7 @@ function ServerBrowse() {
     if (!open) return;
     setState((x) => ({ ...x, [b.id]: 'busy' }));
     try {
-      await mangaApi.serverImport(open.id, open.name, b.id, b.name);
+      await mangaApi.serverImport(open.id, open.name, b.id, b.name, mangaSide());
       setState((x) => ({ ...x, [b.id]: 'done' }));
     } catch (err) {
       setState((x) => ({ ...x, [b.id]: (err as Error).message }));
@@ -669,7 +729,11 @@ function ServerBrowse() {
             ))}
           </div>
           {Object.values(state).some((v) => v !== 'busy' && v !== 'done') && <p className="footnote">{Object.values(state).find((v) => v !== 'busy' && v !== 'done')}</p>}
-          <p className="footnote">Imported volumes get text recognition on the laptop, then show up under Manga.</p>
+          <p className="footnote">
+            {mangaSide() === 'en'
+              ? 'Imported volumes go to the English side of Manga, ready to read.'
+              : 'Imported volumes get text recognition on the laptop, then show up under Manga.'}
+          </p>
         </>
       )}
     </div>
@@ -678,8 +742,20 @@ function ServerBrowse() {
 
 /** `initial`: a title to look for at once (from the List tab) */
 function Browse({ initial }: { initial: string }) {
+  // A title from the List tab is looked for in Japanese; otherwise the side the Manga screen is on.
+  const [lang] = useState<MangaLang>(() => {
+    if (initial) setMangaSide('ja');
+    return mangaSide();
+  });
+  const sourceKey = lang === 'en' ? 'horu-source-en' : 'horu-source';
   const [sources, setSources] = useState<Source[]>();
-  const [source, setSource] = useState<string>(() => localStorage.getItem('horu-source') ?? '');
+  const [source, setSource] = useState<string>(() => {
+    try {
+      return localStorage.getItem(sourceKey) ?? '';
+    } catch {
+      return '';
+    }
+  });
   const [query, setQuery] = useState(initial);
   const [results, setResults] = useState<{ id: number; title: string; inLibrary: boolean }[]>();
   const [busy, setBusy] = useState(false);
@@ -687,7 +763,7 @@ function Browse({ initial }: { initial: string }) {
   const [showExtensions, setShowExtensions] = useState(false);
 
   const loadSources = () =>
-    mangaApi.sources().then(
+    mangaApi.sources(lang).then(
       (s) => {
         setSources(s);
         if (!s.some((x) => x.id === source)) setSource(s[0]?.id ?? '');
@@ -703,11 +779,11 @@ function Browse({ initial }: { initial: string }) {
 
   useEffect(() => {
     try {
-      if (source) localStorage.setItem('horu-source', source);
+      if (source) localStorage.setItem(sourceKey, source);
     } catch {
       // ignore
     }
-  }, [source]);
+  }, [source, sourceKey]);
 
   // The title from the List tab is looked up as soon as a source is there.
   const asked = useRef(false);
@@ -735,7 +811,7 @@ function Browse({ initial }: { initial: string }) {
   return (
     <div>
       <Nav back="Manga" to="manga" />
-      <h1>Find manga</h1>
+      <h1>{lang === 'en' ? 'Find English manga' : 'Find manga'}</h1>
       {!sources && !error && (
         <p className="muted row small">
           <span className="spinner" /> Starting the manga server on the laptop… (first time ~30 s)
@@ -760,7 +836,7 @@ function Browse({ initial }: { initial: string }) {
           <form className="search-row" style={{ marginTop: 12 }} onSubmit={search}>
             <div className="search">
               <Icon name="search" size={17} weight={2} />
-              <input type="search" enterKeyHint="search" placeholder="Title (Japanese works best)" value={query} onChange={(e) => setQuery(e.target.value)} />
+              <input type="search" enterKeyHint="search" placeholder={lang === 'en' ? 'Title' : 'Title (Japanese works best)'} value={query} onChange={(e) => setQuery(e.target.value)} />
             </div>
             <button className="ghost" disabled={busy}>
               {busy ? <span className="spinner" /> : 'Search'}
@@ -775,7 +851,7 @@ function Browse({ initial }: { initial: string }) {
           {results.map((m) => (
             <button key={m.id} className="grid-item" onClick={() => navigate(`manga/remote/${m.id}`)}>
               <Cover src={remoteThumbUrl(m.id)} title={m.title} />
-              <div className="small jp clamp">{m.title}</div>
+              <div className={`small clamp${lang === 'en' ? '' : ' jp'}`}>{m.title}</div>
             </button>
           ))}
           {!results.length && <p className="muted">Nothing found.</p>}
@@ -787,18 +863,18 @@ function Browse({ initial }: { initial: string }) {
           {showExtensions ? 'Hide sources' : 'Manage sources'}
         </button>
       </div>
-      {showExtensions && <Extensions onChange={loadSources} />}
+      {showExtensions && <Extensions lang={lang} onChange={loadSources} />}
     </div>
   );
 }
 
-function Extensions({ onChange }: { onChange: () => void }) {
+function Extensions({ lang, onChange }: { lang: MangaLang; onChange: () => void }) {
   const [list, setList] = useState<{ pkgName: string; name: string; lang: string; isInstalled: boolean; iconUrl: string; isNsfw?: boolean }[]>();
   const [filter, setFilter] = useState('');
   const [busy, setBusy] = useState<string>();
   const [error, setError] = useState<string>();
 
-  const load = () => mangaApi.extensions().then(setList, (e: Error) => setError(e.message));
+  const load = () => mangaApi.extensions(lang).then(setList, (e: Error) => setError(e.message));
   useEffect(() => {
     void load();
   }, []);
@@ -818,7 +894,7 @@ function Extensions({ onChange }: { onChange: () => void }) {
 
   const shown = list
     ?.filter((e) => e.name.toLowerCase().includes(filter.toLowerCase()))
-    .sort((a, b) => Number(b.isInstalled) - Number(a.isInstalled) || Number(b.lang === 'ja') - Number(a.lang === 'ja') || a.name.localeCompare(b.name));
+    .sort((a, b) => Number(b.isInstalled) - Number(a.isInstalled) || Number(b.lang === lang) - Number(a.lang === lang) || a.name.localeCompare(b.name));
 
   return (
     <div style={{ marginTop: 20 }}>
@@ -843,7 +919,11 @@ function Extensions({ onChange }: { onChange: () => void }) {
           ))}
         </div>
       )}
-      <p className="footnote">Japanese sources are community extensions via Suwayomi. Official free sites such as Shōnen Jump+, Comic Days or Magazine Pocket work well.</p>
+      <p className="footnote">
+        {lang === 'en'
+          ? 'English sources are community extensions via Suwayomi. Official free sites such as MANGA Plus work well.'
+          : 'Japanese sources are community extensions via Suwayomi. Official free sites such as Shōnen Jump+, Comic Days or Magazine Pocket work well.'}
+      </p>
     </div>
   );
 }

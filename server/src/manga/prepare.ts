@@ -50,34 +50,45 @@ const EXT_BY_TYPE: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 
 
 // ---- queue ----
 
-const queue: string[] = [];
-let running: string | undefined;
-let draining = false;
+// One line per language: English chapters only need their pages, so they do not wait behind the text
+// recognition of Japanese ones (minutes per chapter).
+type Lane = { queue: string[]; running?: string; draining: boolean };
+const lanes: Record<lib.MangaLang, Lane> = { ja: { queue: [], draining: false }, en: { queue: [], draining: false } };
+const laneOf = (key: string): Lane => lanes[lib.langOf(lib.getChapter(key)?.mangaKey ?? '')];
+const isRunning = (key: string) => lanes.ja.running === key || lanes.en.running === key;
+
+/** Takes a chapter out of whichever line it waits in. */
+function dequeue(key: string): void {
+  for (const lane of Object.values(lanes)) {
+    const i = lane.queue.indexOf(key);
+    if (i >= 0) lane.queue.splice(i, 1);
+  }
+}
+
 /** Stop requests for the chapter being prepared, honoured after the current page. */
 const stops = new Map<string, 'pause' | 'cancel'>();
 
 class Stopped extends Error {}
 
 export function enqueue(key: string, urgent = false): void {
-  const idx = queue.indexOf(key);
-  if (idx >= 0) {
-    if (!urgent) return;
-    queue.splice(idx, 1);
-  }
-  if (urgent) queue.unshift(key);
-  else queue.push(key);
-  void drain();
+  const lane = laneOf(key);
+  const queued = Object.values(lanes).some((l) => l.queue.includes(key));
+  if (queued && !urgent && lane.queue.includes(key)) return;
+  dequeue(key); // also from the other line, when the manga moved language meanwhile
+  if (urgent) lane.queue.unshift(key);
+  else lane.queue.push(key);
+  void drain(lane);
 }
 
-async function drain(): Promise<void> {
-  if (draining) return;
-  draining = true;
+async function drain(lane: Lane): Promise<void> {
+  if (lane.draining) return;
+  lane.draining = true;
   try {
-    while (queue.length) {
-      const key = queue.shift()!;
+    while (lane.queue.length) {
+      const key = lane.queue.shift()!;
       const chapter = lib.getChapter(key);
       if (!chapter || chapter.status === 'ready' || chapter.status === 'paused' || chapter.status === 'cancelled') continue;
-      running = key;
+      lane.running = key;
       try {
         await prepare(chapter);
       } catch (err) {
@@ -87,12 +98,12 @@ async function drain(): Promise<void> {
           lib.updateChapter(key, { status: 'error', error: friendlyMangaError((err as Error).message) });
         }
       } finally {
-        running = undefined;
+        lane.running = undefined;
         stops.delete(key);
       }
     }
   } finally {
-    draining = false;
+    lane.draining = false;
   }
 }
 
@@ -111,9 +122,8 @@ function checkStop(key: string): void {
 export function stopChapter(key: string, how: 'pause' | 'cancel'): void {
   const chapter = lib.getChapter(key);
   if (!chapter) return;
-  if (running === key) return void stops.set(key, how);
-  const idx = queue.indexOf(key);
-  if (idx >= 0) queue.splice(idx, 1);
+  if (isRunning(key)) return void stops.set(key, how);
+  dequeue(key);
   if (how === 'pause' && (chapter.status === 'ready' || chapter.status === 'cancelled')) return;
   stopped(key, how);
 }
@@ -121,9 +131,18 @@ export function stopChapter(key: string, how: 'pause' | 'cancel'): void {
 export function resumeChapter(key: string): void {
   const chapter = lib.getChapter(key);
   if (!chapter || chapter.status === 'ready') return;
-  if (running === key) return void stops.delete(key);
+  if (isRunning(key)) return void stops.delete(key);
   lib.updateChapter(key, { status: 'queued', error: undefined });
   enqueue(key, true);
+}
+
+/**
+ * A manga moved to the other language. To Japanese: its chapters get text recognition (they were only pages).
+ * To English: nothing to do, the text already read stays unused.
+ */
+export function languageChanged(mangaKey: string): void {
+  if (lib.langOf(mangaKey) !== 'ja' || !ocr.available()) return;
+  for (const c of lib.chaptersOf(mangaKey)) if (c.status === 'ready' && !lib.readChapterData(c.key)?.pages.some((p) => p.blocks.length)) rereadChapter(c.key);
 }
 
 /** Pause or resume every chapter of a manga that is not ready yet. */
@@ -193,7 +212,9 @@ let rereading = false;
 
 /** Queues a chapter. It stays readable: the new text replaces the old one when the whole chapter is through. */
 export function rereadChapter(key: string): void {
-  if (lib.getChapter(key)?.status !== 'ready') throw new Error('Only finished chapters can be read again');
+  const chapter = lib.getChapter(key);
+  if (chapter?.status !== 'ready') throw new Error('Only finished chapters can be read again');
+  if (lib.langOf(chapter.mangaKey) !== 'ja') throw new Error('English chapters have no text recognition.');
   if (!ocr.available()) throw new Error('Text recognition is not installed on the laptop.');
   lib.updateChapter(key, { rereading: true, rereadPages: undefined });
   if (!toReread.includes(key)) toReread.push(key);
@@ -261,8 +282,16 @@ async function prepare(chapter: lib.PreparedChapter): Promise<void> {
     files = fs.readdirSync(dir).filter((f) => /\.(jpe?g|png|webp|gif|avif)$/i.test(f)).sort();
   }
 
-  lib.updateChapter(chapter.key, { status: 'ocr', pagesDone: 0, pageCount: files.length });
   const manga = lib.getManga(chapter.mangaKey);
+  // English: only read, so no text recognition. Ready as soon as the pages are there.
+  if (lib.langOf(chapter.mangaKey) !== 'ja') {
+    const pages = files.map((file) => ({ file, w: 0, h: 0, blocks: [] }));
+    lib.writeChapterData({ key: chapter.key, mangaKey: chapter.mangaKey, mangaTitle: manga?.title ?? '', name: chapter.name, order: chapter.order, pages });
+    lib.updateChapter(chapter.key, { status: 'ready', preparedAt: new Date().toISOString(), error: undefined, pagesDone: files.length, pageCount: files.length });
+    log.info(`Chapter ready (English): ${manga?.title} / ${chapter.name} (${pages.length} pages)`);
+    return;
+  }
+  lib.updateChapter(chapter.key, { status: 'ocr', pagesDone: 0, pageCount: files.length });
   const pages: lib.ChapterPage[] = [];
   for (let i = 0; i < files.length; i++) {
     checkStop(chapter.key);
@@ -294,9 +323,8 @@ function markNotJapanese(mangaKey: string): void {
   lib.updateManga(mangaKey, { notJapanese: true });
   for (const c of lib.chaptersOf(mangaKey)) {
     if (c.status === 'queued' || c.status === 'error') {
+      dequeue(c.key);
       lib.removeChapter(c.key);
-      const i = queue.indexOf(c.key);
-      if (i >= 0) queue.splice(i, 1);
     }
   }
 }
@@ -344,8 +372,7 @@ export async function syncWindows(): Promise<void> {
           if (windowKeys.has(c.key)) continue;
           // Waiting chapters the window no longer reaches (the setting was lowered) are dropped.
           if (c.status === 'queued') {
-            const i = queue.indexOf(c.key);
-            if (i >= 0) queue.splice(i, 1);
+            dequeue(c.key);
             lib.removeChapter(c.key);
             continue;
           }
@@ -378,7 +405,7 @@ export function startMangaWorker(): void {
   // Chapters that were being read again when the service stopped.
   for (const c of lib.allChapters()) if (c.rereading) rereadChapter(c.key);
   // Chapters prepared before the language check.
-  for (const c of lib.allChapters()) {
+  for (const c of lib.japaneseChapters()) {
     if (c.status !== 'ready' || 'chinese' in c) continue;
     const chinese = looksChinese(lib.readChapterData(c.key)?.pages.flatMap((p) => p.blocks.map((b) => b.text)) ?? []) === true;
     lib.updateChapter(c.key, { chinese });

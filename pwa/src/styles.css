@@ -787,6 +787,7 @@ button.ghost.on { color: var(--accent); font-weight: 600; }
 /* ==================================================================== list tab */
 
 .list-type { margin-top: 10px; }
+.manga-side { margin-bottom: 18px; }
 .list-top-bar { margin-top: 18px; gap: 10px; }
 .list-top-bar select { width: auto; flex: none; max-width: 42%; }
 .media-row { display: flex; align-items: center; gap: 8px; }

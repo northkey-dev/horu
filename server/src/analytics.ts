@@ -4,7 +4,7 @@ import express, { type Request, type Response } from 'express';
 import { DATA_DIR, getSettings, writeJsonAtomic } from './config.ts';
 import { ankiOnline, ensureAnki, invoke } from './anki.ts';
 import { knownSet, knownSummary } from './knownWords.ts';
-import { allChapters } from './manga/library.ts';
+import { japaneseChapters } from './manga/library.ts';
 import { log } from './log.ts';
 import { levelOf, READ_BLOCK_WORDS, streaks, watchBlocksByDay, WATCH_BLOCK_SECONDS, XP } from './xp.ts';
 import { wordsReadByDay } from './text.ts';
@@ -266,7 +266,8 @@ export async function analytics(): Promise<Analytics> {
     w.episodes.set(s.episode, (w.episodes.get(s.episode) ?? 0) + seconds / 60);
     watchedBy.set(s.title, w);
   }
-  for (const c of allChapters()) if (c.readAt) horuDay(dayKey(Date.parse(c.readAt))).chapters++;
+  // English manga are only read: they count for nothing here.
+  for (const c of japaneseChapters()) if (c.readAt) horuDay(dayKey(Date.parse(c.readAt))).chapters++;
 
   const watchBlocks = watchBlocksByDay(watchSeconds);
   const allBlocks = [...watchBlocks.values()].reduce((n, b) => n + b, 0);
@@ -306,7 +307,7 @@ export async function analytics(): Promise<Analytics> {
   // Lifetime XP from everything we know, not just the heatmap window.
   const allReviews = ankiCache?.stats.totals.reviews ?? 0;
   const episodes = [...episodeSeconds.values()].filter((sec) => sec >= WATCH_BLOCK_SECONDS).length;
-  const chapters = allChapters().filter((c) => c.readAt).length;
+  const chapters = japaneseChapters().filter((c) => c.readAt).length;
   const done = moments.filter((m) => m.status === 'done').length;
   const xp = allReviews * XP.review + moments.length * XP.mark + done * XP.card + allBlocks * XP.watchBlock + chapters * XP.chapter + allReadBlocks * XP.readBlock;
 

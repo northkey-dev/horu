@@ -6,8 +6,13 @@ import type { Printed } from '../../../shared/readings.ts';
 import { laptopBase, laptopUrl } from './laptop.ts';
 import { friendlyMangaError } from '../../../shared/mangaErrors.ts';
 
+/** Japanese manga are for learning; English ones are only read (no text recognition, no stats). */
+export type MangaLang = 'ja' | 'en';
+
 export type LibraryManga = {
   key: string;
+  /** Not set = Japanese */
+  lang?: MangaLang;
   title: string;
   source: string;
   status: 'reading' | 'paused';
@@ -121,9 +126,9 @@ async function send<T>(method: string, path: string, body?: unknown): Promise<T>
 
 export const mangaApi = {
   status: () => get<{ suwayomiInstalled: boolean; ocrAvailable: boolean }>('/api/manga/status'),
-  extensions: () => get<Extension[]>('/api/manga/extensions?lang=ja'),
+  extensions: (lang: MangaLang) => get<Extension[]>(`/api/manga/extensions?lang=${lang}`),
   setExtension: (pkg: string, install: boolean) => send('POST', `/api/manga/extensions/${encodeURIComponent(pkg)}`, { install }),
-  sources: () => get<Source[]>('/api/manga/sources'),
+  sources: (lang: MangaLang) => get<Source[]>(`/api/manga/sources?lang=${lang}`),
   search: (source: string, q: string, page = 1) =>
     get<{ mangas: RemoteManga[]; hasNextPage: boolean }>(`/api/manga/search?source=${source}&q=${encodeURIComponent(q)}&page=${page}`),
   remote: (id: number, refresh = false) =>
@@ -136,8 +141,11 @@ export const mangaApi = {
     return lib;
   },
   cachedLibrary: () => readJson<LibraryManga[]>(LIBRARY_KEY, []),
-  addToLibrary: (mangaId: number, chapterKey?: string) => send<LibraryManga>('POST', '/api/manga/library', { mangaId, chapterKey }),
+  /** `lang`: the side it is added from, for sources that carry several languages */
+  addToLibrary: (mangaId: number, chapterKey?: string, lang: MangaLang = mangaSide()) => send<LibraryManga>('POST', '/api/manga/library', { mangaId, chapterKey, lang }),
   setStatus: (key: string, status: 'reading' | 'paused') => send<LibraryManga>('PATCH', `/api/manga/library/${key}`, { status }),
+  /** Moves a manga to the other side (Japanese with text recognition, or English, only read) */
+  setLang: (key: string, lang: MangaLang) => send<LibraryManga>('PATCH', `/api/manga/library/${key}`, { lang }),
   remove: (key: string) => send('DELETE', `/api/manga/library/${key}`),
   chapterInsight: (key: string) => get<EpisodeInsight>(`/api/manga/chapters/${key}/insight`),
   chapters: (key: string) => get<PreparedChapter[]>(`/api/manga/library/${key}/chapters`),
@@ -171,13 +179,13 @@ export const mangaApi = {
   pauseDownloads: (mangaKey: string, pause: boolean) => send<PreparedChapter[]>('POST', `/api/manga/library/${mangaKey}/downloads`, { pause }),
   serverSearch: (q: string) => get<{ id: string; name: string; books?: number }[]>(`/api/manga/server/search?q=${encodeURIComponent(q)}`),
   serverBooks: (id: string) => get<{ id: string; name: string }[]>(`/api/manga/server/series/${encodeURIComponent(id)}`),
-  serverImport: (seriesId: string, seriesName: string, bookId: string, bookName: string) =>
-    send<LibraryManga>('POST', '/api/manga/server/import', { seriesId, seriesName, bookId, bookName }),
-  importFile: async (file: File) => {
+  serverImport: (seriesId: string, seriesName: string, bookId: string, bookName: string, lang: MangaLang) =>
+    send<LibraryManga>('POST', '/api/manga/server/import', { seriesId, seriesName, bookId, bookName, lang }),
+  importFile: async (file: File, lang: MangaLang) => {
     const res = await fetch(laptopUrl('/api/manga/import'), {
       method: 'POST',
       credentials: 'same-origin',
-      headers: { 'x-filename': encodeURIComponent(file.name), 'Content-Type': 'application/octet-stream' },
+      headers: { 'x-filename': encodeURIComponent(file.name), 'x-lang': lang, 'Content-Type': 'application/octet-stream' },
       body: file,
     });
     const data = await res.json().catch(() => ({}));
@@ -185,6 +193,31 @@ export const mangaApi = {
     return data as LibraryManga;
   },
 };
+
+// ---- Japanese or English: the side of the Manga screen, remembered on this phone ----
+
+const SIDE_KEY = 'horu-manga-lang';
+
+export function mangaSide(): MangaLang {
+  try {
+    return localStorage.getItem(SIDE_KEY) === 'en' ? 'en' : 'ja';
+  } catch {
+    return 'ja';
+  }
+}
+
+export function setMangaSide(lang: MangaLang): void {
+  try {
+    localStorage.setItem(SIDE_KEY, lang);
+  } catch {
+    // private mode: back to Japanese next time
+  }
+}
+
+export const langOf = (m?: { lang?: MangaLang }): MangaLang => m?.lang ?? 'ja';
+
+/** The language of a manga by its key, from the library this phone knows (also offline). */
+export const mangaLangByKey = (mangaKey: string): MangaLang => langOf(mangaApi.cachedLibrary().find((m) => m.key === mangaKey));
 
 export const fileUrl = (chapterKey: string, file: string) => `${laptopBase() ?? ''}/api/manga/files/${chapterKey}/${file}`;
 export const thumbUrl = (mangaKey: string) => `${laptopBase() ?? ''}/api/manga/thumb/${mangaKey}`;

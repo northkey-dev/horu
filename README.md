@@ -190,6 +190,15 @@ Manga needs the laptop (it downloads the pages and reads the text) and the **man
 
 Everything lives under **Read** in the bottom bar. The *Texts* button there is the text reader for articles and books.
 
+### Japanese and English
+
+At the top of the Manga screen, **日本語 | English** switches between two sides (Horu remembers the last one). Everything below belongs to the side you are on: *Continue*, *Reading*, *Paused*, the sources under **+**, *Import a .cbz or .zip file* and the Komga/Kavita import. A manga added there gets that language, so there is nothing to choose.
+
+- **日本語:** everything this section describes: text recognition, tap a bubble for the dictionary, *Before you read*, the screen at the end of a chapter, XP, streak and recommendations.
+- **English:** only for reading your English manga in the same app. No text recognition (a chapter is ready as soon as its pages are there, and it does not wait behind Japanese chapters), no speech bubbles, no end-of-chapter screen. Pages turn left to right: tap the **right** third (or swipe left) for the next page. English chapters count for nothing in your stats (XP, streak, achievements, *For you*). The limit of manga read at once (Settings → Manga) counts each side on its own.
+- **On the wrong side?** Open the manga → **Move to English** / **Move to 日本語**. Moved to Japanese, the laptop reads the text of its chapters.
+- *On this phone* (Sync) and *Storage* are at the bottom and cover both sides.
+
 ### 1. Add a source (once)
 
 Horu ships **no** manga sources and no source repository. Which sites you read, and whether that is allowed where you live, is your responsibility. Official free services (for example Shōnen Jump+, Comic Days, Magazine Pocket) work well, and your own files and Komga/Kavita always work.
@@ -203,7 +212,7 @@ Sources are small community extensions for [Suwayomi](https://github.com/Suwayom
 
 Good to know:
 - The first time you open this page the laptop starts Suwayomi, which takes about 30 seconds.
-- Only Japanese sources are shown (and those that cover all languages).
+- Only sources of the side you are on are shown: Japanese ones on 日本語, English ones on English (and those that cover all languages on both).
 - **Most Japanese raw sites are marked 18+ in the extension store** (Rawkuma, Pixiv Comic, Piccoma …), so they are **hidden until you switch on Settings → Manga → Show 18+ sources**. If you cannot find a source you expect, this is almost always why. Turn it on, then open *Manage sources* again. The switch only unhides the list; it does not change what the sources contain.
 - The list stays empty until a repository is set.
 

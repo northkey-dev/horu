@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { navigate } from '../lib/hooks.ts';
-import { describeError, fileUrl, loadChapter, mangaApi, mineLine, offlineChaptersOf, reportProgress, savedPage, type ChapterData } from '../lib/manga.ts';
+import { describeError, fileUrl, loadChapter, mangaApi, mangaLangByKey, mineLine, offlineChaptersOf, reportProgress, savedPage, type ChapterData } from '../lib/manga.ts';
 import { dragFrame, type Box, type Grip } from '../../../shared/frames.ts';
 import { looksChinese } from '../../../shared/lang.ts';
 import { TokenText, isWord } from '../components/TokenText.tsx';
@@ -14,7 +14,8 @@ import { recordScore, resultSince, snapshotOf, type Result, type Snapshot } from
 import { chapterStamps } from '../lib/kanjiSkill.ts';
 
 // Full-screen manga reader. Japanese order: tap the LEFT side (or swipe right)
-// for the next page. Tap a speech bubble to read it with the dictionary or translate it whole. Pinch or
+// for the next page. English manga read the other way (tap right, swipe left) and are only pages: no bubbles,
+// no end-of-chapter screen. Tap a speech bubble to read it with the dictionary or translate it whole. Pinch or
 // double-tap the middle to zoom in; the bubbles zoom with the page. A bubble read wrongly can get a new frame:
 // its corners and edges are dragged, the page can still be zoomed, and the laptop reads what the frame holds.
 
@@ -119,6 +120,10 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
   const quietUntil = useRef(0);
   const touchedAt = useRef(0);
   const goRef = useRef<(delta: number) => void>(() => undefined);
+  /** An English edition: left to right, only pages */
+  const [english, setEnglish] = useState(false);
+  const englishRef = useRef(english);
+  englishRef.current = english;
 
   useEffect(() => {
     setData(undefined);
@@ -129,10 +134,14 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
     setDone(undefined);
     loadChapter(chapterKey).then(
       (d) => {
+        const en = mangaLangByKey(d.mangaKey) === 'en';
+        setEnglish(en);
         setData(d);
-        const snapshot = snapshotOf(d, chapterKey, bubbleEdits());
-        snapshot.catch(() => undefined);
-        opened.current = { key: chapterKey, snapshot };
+        if (!en) {
+          const snapshot = snapshotOf(d, chapterKey, bubbleEdits());
+          snapshot.catch(() => undefined);
+          opened.current = { key: chapterKey, snapshot };
+        }
         // Where this chapter was left: the page remembered on this phone, else the laptop's note. A chapter left on
         // its last page was finished, and starts over.
         const lib = mangaApi.cachedLibrary().find((m) => m.key === d.mangaKey);
@@ -156,7 +165,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
   const view = shown?.chapterKey === chapterKey ? shown : undefined;
   const current = view && data?.pages[view.page];
   const waiting = !!data && view?.page !== page;
-  const chinese = useMemo(() => data && looksChinese(data.pages.flatMap((p) => p.blocks.map((b) => b.text))), [data]);
+  const chinese = useMemo(() => data && !english && looksChinese(data.pages.flatMap((p) => p.blocks.map((b) => b.text))), [data, english]);
 
   const editKey = (i: number) => `${chapterKey}/${view?.page}/${i}`;
   /** The text of a bubble: as corrected by hand, else as recognised */
@@ -186,7 +195,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
 
   // Double-page spreads are small on a phone held upright: say what helps, once per visit.
   useEffect(() => {
-    if (!current || spreadHinted || current.w / current.h < 1.15 || innerHeight < innerWidth) return;
+    if (!current?.w || spreadHinted || current.w / current.h < 1.15 || innerHeight < innerWidth) return;
     spreadHinted = true;
     setSpread(true);
   }, [current]);
@@ -199,7 +208,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
   // Bubbles tinted by new words (Settings → Manga reader): the more words you do not know yet, the stronger.
   useEffect(() => {
     setTints(undefined);
-    if (!tintOn || !current) return;
+    if (!tintOn || !current || english) return;
     let alive = true;
     (async () => {
       const lists = await Promise.all(current.blocks.map((_, i) => tokenize(textOf(i)).then((t) => t.filter(isWord), () => [])));
@@ -219,7 +228,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tintOn, current, edits]);
+  }, [tintOn, current, edits, english]);
 
   useEffect(() => {
     if (!data) return;
@@ -281,6 +290,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
   async function finishChapter() {
     if (!data) return;
     try {
+      if (english) throw new Error('only read');
       if (!readerPrefs().chapterEnd) throw new Error('switched off');
       const start = opened.current?.key === chapterKey ? await opened.current.snapshot : await snapshotOf(data, chapterKey, bubbleEdits());
       if (!start.words.length) throw new Error('no words');
@@ -379,7 +389,8 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
       if (!zoomed && !frameRef.current && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - from.t < 600) {
         e.preventDefault();
         quietUntil.current = Date.now() + 400;
-        goRef.current(dx > 0 ? 1 : -1); // swipe right = next page (right-to-left reading)
+        // Swipe right = next page (right-to-left reading); English the other way round.
+        goRef.current((dx > 0) !== englishRef.current ? 1 : -1);
         return;
       }
       if (from.moved) return;
@@ -411,8 +422,8 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
     const x = e.clientX - r.left;
     if (block !== undefined) return setBlock(undefined);
     if (zoomRef.current.s > 1) return setChrome((c) => !c);
-    if (x < r.width * 0.33) go(1);
-    else if (x > r.width * 0.67) go(-1);
+    if (x < r.width * 0.33) go(english ? -1 : 1);
+    else if (x > r.width * 0.67) go(english ? 1 : -1);
     else setChrome((c) => !c);
   }
 
@@ -501,7 +512,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
           <button className="icon-btn" onClick={() => navigate(data ? `manga/m/${data.mangaKey}` : 'manga')} aria-label="Back">
             <Icon name="back" size={28} weight={2.1} />
           </button>
-          <div className="grow center jp" style={{ minWidth: 0 }}>
+          <div className={`grow center${english ? '' : ' jp'}`} style={{ minWidth: 0 }}>
             <div className="ellipsis" style={{ fontWeight: 600 }}>
               {data?.mangaTitle}
             </div>
@@ -521,7 +532,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
       <div ref={stage} className="reader-page" onClick={onTap} onDoubleClick={onDoubleClick}>
         <div className="reader-zoom" style={{ transform: zoom.s > 1 ? `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.s})` : undefined }}>
           {view && <img src={view.src} alt="" draggable={false} onLoad={measure} />}
-          {current && rect && (
+          {current && rect && !english && (
             <div className="blocks" style={{ left: rect.left, top: rect.top }}>
               {!frame && current.blocks.map((b, i) => (
                 <div
@@ -585,7 +596,21 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
         </div>
       )}
 
-      {chrome && !frame && data && (
+      {chrome && !frame && data && english && (
+        <div className="reader-bottom">
+          <button className="ghost" onClick={() => go(-1)} aria-label="Previous page">
+            <Icon name="next" size={22} weight={2.1} /> Back
+          </button>
+          <div className="grow center page-count">
+            {page + 1} of {data.pages.length}
+            {page === data.pages.length - 1 && !neighbours.next && <div className="muted" style={{ fontSize: 12, fontWeight: 400 }}>Last chapter on this phone</div>}
+          </div>
+          <button className="ghost" onClick={() => go(1)} aria-label="Next page">
+            Next <Icon name="prev" size={22} weight={2.1} />
+          </button>
+        </div>
+      )}
+      {chrome && !frame && data && !english && (
         <div className="reader-bottom">
           <button className="ghost" onClick={() => go(1)} aria-label="Next page">
             <Icon name="next" size={22} weight={2.1} /> Next

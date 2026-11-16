@@ -27,7 +27,12 @@ function mokuroPages(files: Record<string, Uint8Array>): Map<string, MokuroPage>
   return pages;
 }
 
-export function importArchive(zip: Uint8Array, fileName: string, opts: { mangaKey?: string; mangaTitle?: string; chapterName?: string; source?: string } = {}): string {
+/** `lang`: the edition's language for a manga new to the library (an existing one keeps its own). */
+export function importArchive(
+  zip: Uint8Array,
+  fileName: string,
+  opts: { mangaKey?: string; mangaTitle?: string; chapterName?: string; source?: string; lang?: lib.MangaLang } = {},
+): string {
   const files = unzipSync(zip, { filter: (f) => !f.name.startsWith('__MACOSX') });
   const entries = Object.entries(files)
     .filter(([n, bytes]) => IMAGE_EXT.test(n) && bytes.length > 0)
@@ -42,7 +47,7 @@ export function importArchive(zip: Uint8Array, fileName: string, opts: { mangaKe
     const group = parts.length > 1 ? parts.slice(0, -1).join('/') : title;
     groups.set(group, [...(groups.get(group) ?? []), entry]);
   }
-  if (!lib.getManga(key)) lib.upsertManga({ key, title, source: opts.source ?? 'Imported file', addedAt: new Date().toISOString(), status: 'reading', hasThumb: false });
+  if (!lib.getManga(key)) lib.upsertManga({ key, title, source: opts.source ?? 'Imported file', addedAt: new Date().toISOString(), status: 'reading', hasThumb: false, lang: opts.lang === 'en' ? 'en' : undefined });
   let order = lib.chaptersOf(key).reduce((n, c) => Math.max(n, c.order + 1), 0);
   for (const [group, list] of groups) {
     const chapterKey = `${key}-${order + 1}`;

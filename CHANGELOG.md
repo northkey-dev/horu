@@ -2,6 +2,14 @@
 
 Release numbers follow `package.json`. The app, the laptop service and the Chrome extension share one number.
 
+## 1.4.0 (2026-11-16)
+
+**English manga** in the Manga screen: **日本語 | English** at the top, each side with its own *Continue*, *Reading*, *Paused*, sources (+), file import and Komga/Kavita import; the side you are on sets the language of what you add.
+- English chapters are only read: no text recognition (ready once the pages are there, in their own queue so they never wait behind Japanese text recognition), no speech bubbles, no end-of-chapter screen, pages turn left to right.
+- They count for nothing in XP, streak, achievements or *For you*; the limit of manga read at once counts each side on its own.
+- **Move to English / Move to 日本語** on a manga; moved to Japanese, its chapters get text recognition.
+- *On this phone* and *Storage* moved to the bottom of the Manga screen (they cover both sides).
+
 ## 1.3.1 (2026-11-16)
 
 List tab, title sheet: **The manga** / **The anime**: from an anime to its manga and back (the first TV season; light novels left out), the list behind switches to manga or anime with it. *All seasons* no longer scrolls sideways with long titles.
