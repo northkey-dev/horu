@@ -15,6 +15,7 @@ import {
   readHref,
   removeFromList,
   search,
+  series,
   startedIds,
   subtitlesFor,
   suggest,
@@ -26,7 +27,7 @@ import {
   type ForYou,
 } from '../lib/watchlist.ts';
 import { isMarked, liveItems, markedItems, onList, type MarkKind, type Media, type MediaKind, type Watchlist } from '../../../shared/watchlist.ts';
-import { releaseLine, type Chart, type MediaDetail } from '../../../shared/anilist.ts';
+import { releaseLine, seriesSummary, type Chart, type MediaDetail, type Part } from '../../../shared/anilist.ts';
 import type { Recommendation, SeedWhy } from '../../../shared/recommend.ts';
 import type { JimakuEntry } from '../../../shared/types.ts';
 import { Icon } from '../components/Icon.tsx';
@@ -146,7 +147,9 @@ function Lists({ route }: { route: string[] }) {
       {view === 'foryou' && <ForYouView {...ctx} />}
       {view === 'top' && <Top {...ctx} />}
 
-      {open && list && <MediaSheet media={open.media} because={open.because} list={list} started={started.has(open.media.id)} onClose={() => setOpen(undefined)} />}
+      {open && list && (
+        <MediaSheet key={open.media.id} media={open.media} because={open.because} list={list} started={started.has(open.media.id)} onOpen={(m) => show(m)} onClose={() => setOpen(undefined)} />
+      )}
     </div>
   );
 }
@@ -608,8 +611,23 @@ function MarkedPage({ kind }: { kind: MarkKind }) {
 
 // ---------------------------------------------------------------- one title
 
-function MediaSheet({ media, because, list, started, onClose }: { media: Media; because?: Recommendation['because']; list: Watchlist; started: boolean; onClose: () => void }) {
+function MediaSheet({
+  media,
+  because,
+  list,
+  started,
+  onOpen,
+  onClose,
+}: {
+  media: Media;
+  because?: Recommendation['because'];
+  list: Watchlist;
+  started: boolean;
+  onOpen: (m: Media) => void;
+  onClose: () => void;
+}) {
   const [info, setInfo] = useState<MediaDetail>();
+  const [parts, setParts] = useState<Part[]>();
   const [more, setMore] = useState(false);
   const [subs, setSubs] = useState<JimakuEntry | null | undefined | 'checking' | 'failed'>('checking');
   const [coverage, setCoverage] = useState<number>();
@@ -619,9 +637,11 @@ function MediaSheet({ media, because, list, started, onClose }: { media: Media; 
   const seen = isMarked(list, 'seen', media.id);
   const anime = media.type === 'ANIME';
   const release = info && (info.status || info.episodes || info.chapters) ? releaseLine(info) : undefined;
+  const whole = parts && parts.length > 1 ? seriesSummary(parts, media.id) : undefined;
 
   useEffect(() => {
     void detail(media.id).then(setInfo, () => undefined);
+    void series(media.id).then(setParts, () => undefined);
     if (media.type !== 'ANIME') return;
     subtitlesFor(media).then(
       (entry) => {
@@ -648,6 +668,14 @@ function MediaSheet({ media, because, list, started, onClose }: { media: Media; 
               <div className="sub media-status">
                 {release.status && <span className={`tag${info?.status === 'FINISHED' ? ' common' : ''}`}>{release.status}</span>}
                 {release.count}
+              </div>
+            )}
+            {whole?.next && (
+              <div className="sub media-status">
+                <span className="tag">Series</span>
+                {whole.nextState === 'running' ? 'Still running: ' : 'Goes on: '}
+                {whole.next.title}
+                {whole.nextState === 'running' ? (anime ? ' airing now' : ' coming out now') : whole.next.start ? ` announced for ${whole.next.start.slice(0, 4)}` : ' announced'}
               </div>
             )}
             {!!info?.creators.length && (
@@ -698,6 +726,42 @@ function MediaSheet({ media, because, list, started, onClose }: { media: Media; 
           <button className="ghost small" style={{ marginTop: 8 }} onClick={() => void (dismissed ? undoNotInterested(media.id) : notInterested(media).then(onClose))}>
             {dismissed ? 'Interested again' : 'Not interested'}
           </button>
+        )}
+
+        {parts && parts.length > 1 && (
+          <>
+            <h2>{anime ? 'All seasons' : 'All parts'}</h2>
+            <div className="group">
+              {parts.map((p) => {
+                const here = p.id === media.id;
+                const r = releaseLine(p);
+                const body = (
+                  <>
+                    <Cover m={p} small />
+                    <span className="grow">
+                      <span className="ellipsis">{p.title}</span>
+                      <span className="sub ellipsis">{[p.format && FORMATS[p.format], p.year, r.count, here ? 'Open now' : r.status].filter(Boolean).join(' · ')}</span>
+                    </span>
+                  </>
+                );
+                return here ? (
+                  <div key={p.id} className="list-item season-here" aria-current="true">
+                    {body}
+                  </div>
+                ) : (
+                  <button key={p.id} className="list-item" onClick={() => onOpen(p)}>
+                    {body}
+                  </button>
+                );
+              })}
+            </div>
+            {whole?.total && (
+              <p className="footnote">
+                {whole.total}
+                {anime ? ', films and specials not counted.' : '.'}
+              </p>
+            )}
+          </>
         )}
 
         {media.type === 'ANIME' && (

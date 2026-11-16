@@ -2,6 +2,10 @@
 
 Release numbers follow `package.json`. The app, the laptop service and the Chrome extension share one number.
 
+## 1.3.0 (2026-11-16)
+
+List tab, title sheet: **All seasons** of the series (AniList keeps each season as its own title; Horu follows the prequel and sequel links): every season, film and special in order with status and length, tap one to open it, total of episodes below. A **Series** line when the series goes on although the open season is finished (*Still running: … airing now*, *Goes on: … announced for 2027*). Films no longer show "1 episode".
+
 ## 1.2.1 (2026-11-16)
 
 List tab, title sheet: **finished or ongoing** (also not out yet, cancelled, on hiatus) and the length: episodes (while airing: how many are out of how many), chapters and volumes of a manga.

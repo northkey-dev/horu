@@ -198,3 +198,32 @@ test('releaseLine: status and how many episodes or chapters', async () => {
   assert.deepEqual(releaseLine({ type: 'MANGA', status: 'RELEASING' }), { status: 'Ongoing', count: 'chapter count still open' });
   assert.deepEqual(releaseLine({ type: 'MANGA', status: 'HIATUS', volumes: 3 }), { status: 'On hiatus', count: '3 volumes so far' });
 });
+
+test('seriesSummary: seasons are one series, still going while a part airs or is announced', async () => {
+  const { orderParts, seriesSummary } = await import('../../shared/anilist.ts');
+  const p = (id, extra) => ({ id, type: 'ANIME', title: `S${id}`, genres: [], format: 'TV', status: 'FINISHED', ...extra });
+  const parts = orderParts([
+    p(5, { status: 'NOT_YET_RELEASED' }),
+    p(3, { episodes: 23, start: '2023-07-06' }),
+    p(1, { format: 'MOVIE', episodes: 1, start: '2021-12-24' }),
+    p(2, { episodes: 24, start: '2020-10-03' }),
+    p(4, { episodes: 12, start: '2026-01-08' }),
+  ]);
+  assert.deepEqual(parts.map((x) => x.id), [2, 1, 3, 4, 5]);
+  const s = seriesSummary(parts, 2);
+  assert.equal(s.next.id, 5);
+  assert.equal(s.nextState, 'announced');
+  assert.equal(s.total, '59 episodes so far');
+  assert.equal(seriesSummary(parts, 5).next, undefined);
+  const airing = seriesSummary([p(2, { episodes: 24 }), p(3, { status: 'RELEASING', episodes: 12, aired: 4 })], 2);
+  assert.equal(airing.nextState, 'running');
+  assert.equal(airing.total, '28 episodes so far');
+  assert.deepEqual(seriesSummary([p(2, { episodes: 24 }), p(3, { episodes: 12 })], 2), { total: '36 episodes in all' });
+});
+
+test('releaseLine: a film has no episode count; one-off web episodes do not count for the series', async () => {
+  const { releaseLine, seriesSummary } = await import('../../shared/anilist.ts');
+  assert.deepEqual(releaseLine({ type: 'ANIME', format: 'MOVIE', status: 'FINISHED', episodes: 1 }), { status: 'Finished', count: undefined });
+  const p = (id, extra) => ({ id, type: 'ANIME', title: `S${id}`, genres: [], ...extra });
+  assert.deepEqual(seriesSummary([p(1, { format: 'TV', status: 'RELEASING', aired: 1180 }), p(2, { format: 'ONA', status: 'FINISHED', episodes: 1 })], 1), {});
+});

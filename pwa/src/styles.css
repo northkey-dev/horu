@@ -823,3 +823,4 @@ button.ghost.on { color: var(--accent); font-weight: 600; }
 .media-creators { margin-top: 4px; }
 .media-status { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
 .media-status .tag { margin-left: 0; vertical-align: 0; }
+.season-here { cursor: default; box-shadow: inset 3px 0 0 var(--ink); }

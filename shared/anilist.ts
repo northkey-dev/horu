@@ -186,11 +186,12 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
  * How far a title is: "Finished · 24 episodes", "Ongoing · 11 of 24 episodes out", "Ongoing · 1 volume so far". AniList
  * leaves the chapter count of a running manga open, so there is none then.
  */
-export function releaseLine(d: Pick<MediaDetail, 'type' | 'status' | 'episodes' | 'chapters' | 'aired' | 'volumes'>): { status?: string; count?: string } {
+export function releaseLine(d: Pick<MediaDetail, 'type' | 'status' | 'episodes' | 'chapters' | 'aired' | 'volumes' | 'format'>): { status?: string; count?: string } {
   const status = d.status ? STATUS[d.status] : undefined;
   const running = d.status === 'RELEASING' || d.status === 'HIATUS';
   let count: string | undefined;
-  if (d.type === 'ANIME') {
+  if (d.format === 'MOVIE') count = undefined; // a film is one piece, not "1 episode"
+  else if (d.type === 'ANIME') {
     if (running && d.aired !== undefined) count = d.episodes ? `${d.aired} of ${plural(d.episodes, 'episode')} out` : `${plural(d.aired, 'episode')} out so far`;
     else if (d.episodes) count = d.status === 'NOT_YET_RELEASED' ? `${plural(d.episodes, 'episode')} planned` : plural(d.episodes, 'episode');
   } else {
@@ -251,6 +252,76 @@ export async function mediaDetail(id: number): Promise<MediaDetail> {
     aired: next ? next - 1 : undefined,
     volumes: opt(r.Media.volumes),
   };
+}
+
+// ---------------------------------------------------------------- seasons
+
+/** One part of a series (a season, film, special) with how far it is and when it started (`start`: "2023-07-06", for order). */
+export type Part = Media & { status?: string; aired?: number; start?: string };
+
+const PART_FIELDS = `${FIELDS} status startDate { year month day } nextAiringEpisode { episode }`;
+type RawPart = RawMedia & { status: string | null; startDate?: { year?: number | null; month?: number | null; day?: number | null } | null; nextAiringEpisode: { episode: number } | null };
+
+function toPart(r: RawPart): Part {
+  const d = r.startDate;
+  const pad = (n?: number | null) => String(n ?? 0).padStart(2, '0');
+  const next = r.nextAiringEpisode?.episode;
+  return { ...toMedia(r), status: opt(r.status), aired: next ? next - 1 : undefined, start: d?.year ? `${d.year}-${pad(d.month)}-${pad(d.day)}` : undefined };
+}
+
+/** Parts without a start date (announced, no date yet) go last; otherwise by start date. */
+export const orderParts = (parts: Part[]): Part[] => [...parts].sort((a, b) => (a.start ?? '9999').localeCompare(b.start ?? '9999') || a.id - b.id);
+
+/**
+ * Every part of the series a title belongs to: AniList keeps each season as its own title, linked as prequel and
+ * sequel. Walks those links both ways (one call per step, at most 8 steps and 30 parts), oldest first.
+ */
+export async function seriesParts(id: number): Promise<Part[]> {
+  type Edge = { relationType: string; node: RawPart | null };
+  type R = { Page: { media: (RawPart & { relations: { edges: Edge[] } | null })[] } };
+  const found = new Map<number, Part>();
+  let type: MediaKind | undefined;
+  let frontier = [id];
+  for (let step = 0; step < 8 && frontier.length && found.size < 30; step++) {
+    const r = await gql<R>('', `query ($ids: [Int]) { Page(perPage: 25) { media(id_in: $ids) { ${PART_FIELDS} relations { edges { relationType node { ${PART_FIELDS} } } } } } }`, { ids: frontier.slice(0, 25) });
+    const next: number[] = [];
+    for (const m of r.Page.media) {
+      type ??= m.type;
+      found.set(m.id, toPart(m));
+      for (const e of m.relations?.edges ?? []) {
+        const n = e.node;
+        if (!n || n.type !== type || (e.relationType !== 'PREQUEL' && e.relationType !== 'SEQUEL') || found.has(n.id) || next.includes(n.id)) continue;
+        found.set(n.id, toPart(n));
+        next.push(n.id);
+      }
+    }
+    frontier = next;
+  }
+  return orderParts([...found.values()]).slice(0, 30);
+}
+
+/** Parts that count as episodes of the series: TV seasons and web series; films, specials, OVAs and one-off web episodes are extra. */
+const isSeason = (p: Part) => p.format === 'TV' || p.format === 'TV_SHORT' || (p.format === 'ONA' && (p.episodes ?? 0) > 1);
+
+/**
+ * What the whole series looks like from one of its parts: still going (a part airing or announced) and how many
+ * episodes or chapters it has so far. `next`: the running or announced part, unless that is the one open.
+ */
+export function seriesSummary(parts: Part[], currentId: number): { next?: Part; nextState?: 'running' | 'announced'; total?: string } {
+  const running = parts.find((p) => p.status === 'RELEASING');
+  const announced = parts.find((p) => p.status === 'NOT_YET_RELEASED');
+  const next = running ?? announced;
+  const out: ReturnType<typeof seriesSummary> = next && next.id !== currentId ? { next, nextState: running ? 'running' : 'announced' } : {};
+  const going = Boolean(next);
+  if (parts[0]?.type === 'ANIME') {
+    const series = parts.filter((p) => isSeason(p) && p.status !== 'NOT_YET_RELEASED');
+    const n = series.reduce((a, p) => a + (p.status === 'RELEASING' ? (p.aired ?? 0) : (p.episodes ?? 0)), 0);
+    if (series.length > 1 && n) out.total = `${n} episodes${going ? ' so far' : ' in all'}`;
+  } else {
+    const series = parts.filter((p) => p.format === 'MANGA');
+    if (series.length > 1 && series.every((p) => p.chapters)) out.total = `${series.reduce((a, p) => a + p.chapters!, 0)} chapters in all`;
+  }
+  return out;
 }
 
 let viewer: { token: string; id: number } | undefined;
