@@ -19,14 +19,34 @@ import { chapterStamps } from '../lib/kanjiSkill.ts';
 // the English page of the same chapter in place of the Japanese one (‹ › move it when the editions differ by a page). Tap a speech bubble to read it with the dictionary or translate it whole. Pinch or
 // double-tap the middle to zoom in; the bubbles zoom with the page. A bubble read wrongly can get a new frame:
 // its corners and edges are dragged, the page can still be zoomed, and the laptop reads what the frame holds.
+// A phone held sideways fills the width with the page (a double-page spread gets big) and hides the bars; a drag up
+// or down moves along the page, a tap in the middle brings the bars back.
 
-type Rect = { left: number; top: number; scale: number };
+/** Where the page sits in the stage; `room` is how far it can be moved up when it is taller than the stage (≤ 0). */
+type Rect = { left: number; top: number; scale: number; room: number };
 type Zoom = { s: number; x: number; y: number };
 
 const NO_ZOOM: Zoom = { s: 1, x: 0, y: 0 };
 const MAX_ZOOM = 4;
 const GRIPS: Exclude<Grip, 'move'>[] = ['n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se'];
 let spreadHinted = false;
+
+/** A phone (or tablet) held sideways. Not a laptop: its window is wide anyway, and there the whole page fits. */
+const isSideways = () => matchMedia('(pointer: coarse)').matches && innerWidth > innerHeight;
+
+function useSideways(): boolean {
+  const [sideways, setSideways] = useState(isSideways);
+  useEffect(() => {
+    const check = () => setSideways(isSideways());
+    addEventListener('resize', check);
+    addEventListener('orientationchange', check);
+    return () => {
+      removeEventListener('resize', check);
+      removeEventListener('orientationchange', check);
+    };
+  }, []);
+  return sideways;
+}
 
 /** Keeps the zoomed page inside the stage (the page can be moved, but not out of the screen). */
 function clampZoom(z: Zoom, w: number, h: number): Zoom {
@@ -107,6 +127,13 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
   const [tints, setTints] = useState<number[]>();
   const [zoom, setZoom] = useState<Zoom>(NO_ZOOM);
   const [spread, setSpread] = useState(false);
+  // Held sideways: the page fills the width, and `pan` is how far it is moved up (≤ 0)
+  const sideways = useSideways();
+  const [pan, setPan] = useState(0);
+  const panRef = useRef(pan);
+  panRef.current = pan;
+  const rectRef = useRef(rect);
+  rectRef.current = rect;
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
   // The frame being adjusted (page pixels), the laptop reading it, and the drag going on
@@ -235,18 +262,37 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
   /** The text of a bubble: as corrected by hand, else as recognised */
   const textOf = (i: number) => edits[editKey(i)] ?? current?.blocks[i]?.text ?? '';
 
-  // Every page starts unzoomed.
-  useEffect(() => setZoom(NO_ZOOM), [view?.page, chapterKey]);
+  // Every page starts unzoomed, at its top.
+  useEffect(() => {
+    setZoom(NO_ZOOM);
+    setPan(0);
+  }, [view?.page, chapterKey]);
 
-  // Where the page image actually sits inside the stage (object-fit: contain).
+  // Where the page sits inside the stage: the whole page on screen, or (held sideways) as wide as the screen.
   const measure = useCallback(() => {
     const el = stage.current;
     if (!el || !current?.w) return setRect(undefined);
     const cw = el.clientWidth;
     const ch = el.clientHeight;
-    const scale = Math.min(cw / current.w, ch / current.h);
-    setRect({ left: (cw - current.w * scale) / 2, top: (ch - current.h * scale) / 2, scale });
-  }, [current]);
+    const scale = sideways ? cw / current.w : Math.min(cw / current.w, ch / current.h);
+    const h = current.h * scale;
+    setRect({ left: (cw - current.w * scale) / 2, top: Math.max(0, (ch - h) / 2), scale, room: Math.min(0, ch - h) });
+  }, [current, sideways]);
+
+  // A new size keeps the page on screen.
+  useEffect(() => setPan((p) => Math.max(rect?.room ?? 0, p)), [rect]);
+
+  // Turned sideways the bars go (the page needs the height); upright again they come back.
+  const wasSideways = useRef(sideways);
+  useEffect(() => {
+    if (wasSideways.current === sideways) return;
+    wasSideways.current = sideways;
+    setChrome(!sideways);
+  }, [sideways]);
+  useEffect(() => {
+    if (sideways) setChrome(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // The stage changes size with the phone turning and with the bars coming and going.
   useEffect(() => {
@@ -394,7 +440,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
     const el = stage.current;
     if (!el) return;
     let pinch: { d: number; s: number; px: number; py: number } | undefined;
-    let start: { x: number; y: number; t: number; zx: number; zy: number; moved: boolean } | undefined;
+    let start: { x: number; y: number; t: number; zx: number; zy: number; pan: number; moved: boolean; axis?: 'x' | 'y' } | undefined;
     let lastTap: { x: number; y: number; t: number } | undefined;
     const local = (cx: number, cy: number) => {
       const r = el.getBoundingClientRect();
@@ -418,7 +464,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
         quietUntil.current = Date.now() + 500;
       } else if (e.touches.length === 1) {
         pinch = undefined;
-        start = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), zx: z.x, zy: z.y, moved: false };
+        start = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), zx: z.x, zy: z.y, pan: panRef.current, moved: false };
       }
     };
     const onMove = (e: TouchEvent) => {
@@ -438,6 +484,14 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
           setZoom(clampZoom({ s: zoomRef.current.s, x: start.zx + dx, y: start.zy + dy }, r.w, r.h));
           quietUntil.current = Date.now() + 400;
           e.preventDefault();
+        } else if ((rectRef.current?.room ?? 0) < 0 && !frameRef.current) {
+          // A page taller than the screen (held sideways): an up or down drag moves along it.
+          if (!start.axis && start.moved) start.axis = Math.abs(dy) > Math.abs(dx) ? 'y' : 'x';
+          if (start.axis === 'y') {
+            setPan(Math.min(0, Math.max(rectRef.current!.room, start.pan + dy)));
+            quietUntil.current = Date.now() + 400;
+            e.preventDefault();
+          }
         }
       }
     };
@@ -455,7 +509,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
       const dy = t.clientY - from.y;
       const p = local(t.clientX, t.clientY);
       const zoomed = zoomRef.current.s > 1;
-      if (!zoomed && !frameRef.current && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - from.t < 600) {
+      if (!zoomed && !frameRef.current && from.axis !== 'y' && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - from.t < 600) {
         e.preventDefault();
         quietUntil.current = Date.now() + 400;
         // Swipe right = next page (right-to-left reading); English the other way round.
@@ -607,9 +661,17 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
 
       <div ref={stage} className="reader-page" onClick={onTap} onDoubleClick={onDoubleClick}>
         <div className="reader-zoom" style={{ transform: zoom.s > 1 ? `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.s})` : undefined }}>
-          {view && <img src={enOn && enSrc ? enSrc : view.src} alt="" draggable={false} onLoad={measure} />}
+          {view && (
+            <img
+              src={enOn && enSrc ? enSrc : view.src}
+              alt=""
+              draggable={false}
+              onLoad={measure}
+              style={rect && current ? { left: rect.left, top: rect.top + pan, width: current.w * rect.scale, height: current.h * rect.scale } : undefined}
+            />
+          )}
           {current && rect && !english && !(enOn && enSrc) && (
-            <div className="blocks" style={{ left: rect.left, top: rect.top }}>
+            <div className="blocks" style={{ left: rect.left, top: rect.top + pan }}>
               {!frame && current.blocks.map((b, i) => (
                 <div
                   key={i}

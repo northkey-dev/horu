@@ -2,6 +2,10 @@
 
 Release numbers follow `package.json`. The app, the laptop service and the Chrome extension share one number.
 
+## 1.6.2 (2026-11-17)
+
+Manga reader: **phone sideways = page as wide as the screen.** The page was always fitted whole into the screen, so held sideways (little height, minus the bars) a double-page spread stayed small. Now it fills the width, the bars hide (tap the middle for them), and a drag up or down moves along the page. Page and bars keep clear of the notch. Laptop unchanged.
+
 ## 1.6.1 (2026-11-17)
 
 Manga: **no more gaps in the chapter list.** At the end of a chapter the reader opened the next *prepared* one, so with chapters still waiting it jumped ahead (Kagurabachi: from 2 to 8), your place moved there and the chapters in between were never prepared. Now it opens only the chapter right after (*Next chapter not ready yet* otherwise), and chapters passed over before your place (unread, after the first one read) are prepared again.
