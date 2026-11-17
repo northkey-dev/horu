@@ -467,7 +467,8 @@ function LocalDetail({ mangaKey, online }: { mangaKey: string; online: boolean }
   // The chapter being read and the first prepared one after it (chapters arrive sorted by their order).
   const sorted = chapters.slice().sort((x, y) => x.order - y.order);
   const current = sorted.find((c) => c.key === manga?.chapterKey);
-  const next = current && sorted.find((c) => c.order > current.order && c.status === 'ready');
+  // The very next one (a left-out twin sits at order k - 0.5 before its kept chapter k)
+  const next = current && sorted.find((c) => Math.ceil(c.order) === Math.ceil(current.order) + 1 && Number.isInteger(c.order) && c.status === 'ready');
 
   /** Moves the manga to the other side: English (only read) or Japanese (text recognition runs for its chapters). */
   async function moveTo(lang: MangaLang) {

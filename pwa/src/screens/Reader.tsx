@@ -328,10 +328,15 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
 
   const neighbours = useMemo(() => {
     if (!data) return {};
-    const sorted = [...ready].sort((a, b) => a.order - b.order);
+    // Only the chapter right before / after this one: a chapter not prepared yet is waited for, never jumped over
+    // (it moved your place past it, and the chapters in between were never prepared). A left-out twin sits half a
+    // step before its kept chapter (order k - 0.5), so a chapter's place in the list is its order rounded up.
+    const at = (o: number) => Math.ceil(o);
+    const sorted = [...ready].sort((a, b) => b.order - a.order); // the kept chapter before its twin
     return {
-      next: sorted.find((c) => c.order > data.order),
-      prev: [...sorted].reverse().find((c) => c.order < data.order),
+      next: sorted.find((c) => at(c.order) === at(data.order) + 1),
+      prev: sorted.find((c) => at(c.order) === at(data.order) - 1),
+      later: ready.some((c) => at(c.order) > at(data.order) + 1),
     };
   }, [data, ready]);
 
@@ -674,7 +679,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
           </button>
           <div className="grow center page-count">
             {page + 1} of {data.pages.length}
-            {page === data.pages.length - 1 && !neighbours.next && <div className="muted" style={{ fontSize: 12, fontWeight: 400 }}>Last chapter on this phone</div>}
+            {page === data.pages.length - 1 && !neighbours.next && <div className="muted" style={{ fontSize: 12, fontWeight: 400 }}>{neighbours.later ? 'Next chapter not ready yet' : 'Last chapter on this phone'}</div>}
           </div>
           <button className="ghost" onClick={() => go(1)} aria-label="Next page">
             Next <Icon name="prev" size={22} weight={2.1} />
@@ -702,7 +707,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
                 {page + 1} of {data.pages.length}
               </>
             )}
-            {page === data.pages.length - 1 && !neighbours.next && <div className="muted" style={{ fontSize: 12, fontWeight: 400 }}>Last chapter on this phone</div>}
+            {page === data.pages.length - 1 && !neighbours.next && <div className="muted" style={{ fontSize: 12, fontWeight: 400 }}>{neighbours.later ? 'Next chapter not ready yet' : 'Last chapter on this phone'}</div>}
           </div>
           <button className="ghost" onClick={() => go(-1)} aria-label="Previous page">
             Back <Icon name="prev" size={22} weight={2.1} />

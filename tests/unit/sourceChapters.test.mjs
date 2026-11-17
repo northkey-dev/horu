@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isVolumeBundle, keptFor, pickChapters } from '../../shared/sourceChapters.ts';
+import { isVolumeBundle, keptFor, passedOver, pickChapters } from '../../shared/sourceChapters.ts';
 
 // As MangaFire (EN) lists Kagurabachi: a whole volume as chapter 0, every chapter twice.
 const c = (id, chapterNumber, name, scanlator, uploadDate = '1') => ({ id, chapterNumber, name, scanlator, uploadDate, sourceOrder: id });
@@ -62,4 +62,21 @@ test('keptFor: a place in a left-out duplicate moves to the kept chapter', () =>
   assert.equal(keptFor(list, chapters, 1342).id, 1342);
   assert.equal(keptFor(list, chapters, 1340), undefined);
   assert.equal(keptFor(list, chapters, 9999), undefined);
+});
+
+test('passedOver: unread chapters between the first read one and your place', () => {
+  // As Kagurabachi was left: 1 and 2 read, then the reader went on to the next prepared chapter, 8.
+  const all = [1, 2, 3, 4, 5, 6, 7, 8, 9].flatMap((n) => [
+    { ...c(n * 10, n, `Ch. ${n}`, 'unofficial'), isRead: false },
+    { ...c(n * 10 + 1, n, `Ch. ${n}`, 'official'), isRead: n === 1 || n === 8 },
+  ]);
+  const sorted = pickChapters(all).chapters;
+  const at8 = sorted.findIndex((x) => x.chapterNumber === 8);
+  // Chapter 2 read in Horu only, through its fan twin
+  const missed = passedOver(all, sorted, at8, (x) => x.id === 20);
+  assert.deepEqual(missed.map((x) => x.chapterNumber), [3, 4, 5, 6, 7]);
+  // Nothing read before your place (you opened chapter 8 first, or set your place there): nothing passed over
+  assert.deepEqual(passedOver(all.map((x) => ({ ...x, isRead: false })), sorted, at8, () => false), []);
+  // Your place right after the chapters read: nothing
+  assert.deepEqual(passedOver(all, sorted, 1, () => false), []);
 });

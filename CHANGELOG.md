@@ -2,6 +2,10 @@
 
 Release numbers follow `package.json`. The app, the laptop service and the Chrome extension share one number.
 
+## 1.6.1 (2026-11-17)
+
+Manga: **no more gaps in the chapter list.** At the end of a chapter the reader opened the next *prepared* one, so with chapters still waiting it jumped ahead (Kagurabachi: from 2 to 8), your place moved there and the chapters in between were never prepared. Now it opens only the chapter right after (*Next chapter not ready yet* otherwise), and chapters passed over before your place (unread, after the first one read) are prepared again.
+
 ## 1.6.0 (2026-11-16)
 
 Manga: **carry on a manga read elsewhere.** A small link under *Start reading* (*Already read some? Start at a later chapter*) and, for a manga in the library, *Set my place…* in its Edit mode: type a chapter number, Horu prepares from there. With AniList connected, the chapter after your AniList progress is filled in (only read from AniList). Chapters skipped count as read in the source, not for XP or streak.

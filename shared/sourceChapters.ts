@@ -52,6 +52,18 @@ export function pickChapters<T extends SourceChapter>(list: T[]): { chapters: T[
 }
 
 /**
+ * Chapters passed over: unread ones between the first chapter read and your place (`current`, an index in
+ * `sorted`). An older Horu went on to the next prepared chapter, past ones that were not ready yet, and the reading
+ * window only looks ahead of your place, so these were never prepared. A chapter counts as read when any entry with
+ * its number is (in the source, or in Horu: `readHere`).
+ */
+export function passedOver<T extends SourceChapter & { isRead?: boolean }>(all: T[], sorted: T[], current: number, readHere: (c: T) => boolean): T[] {
+  const read = (c: T) => all.some((t) => (t.id === c.id || (c.chapterNumber >= 0 && t.chapterNumber === c.chapterNumber && !isVolumeBundle(t))) && (t.isRead || readHere(t)));
+  const first = sorted.findIndex(read);
+  return first < 0 || first >= current ? [] : sorted.slice(first + 1, current).filter((c) => !read(c));
+}
+
+/**
  * The entry that took the place of a chapter left out as a duplicate (your place was in the fan translation, the
  * official one is kept): the kept chapter with the same number.
  */

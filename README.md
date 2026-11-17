@@ -241,7 +241,7 @@ Good to know:
 
 ### Reading
 
-- **Turn pages:** tap the **left** third of the screen (or swipe right) for the next page, the **right** third (swipe left) for the previous one: Japanese reading order. Tap the middle to show or hide the bars. The end of a chapter opens the next prepared one.
+- **Turn pages:** tap the **left** third of the screen (or swipe right) for the next page, the **right** third (swipe left) for the previous one: Japanese reading order. Tap the middle to show or hide the bars. The end of a chapter opens the next one; if it is not prepared yet, the reader waits for it instead of skipping ahead (chapters passed over before your place are prepared too).
 - **Zoom:** pinch to zoom in (up to 4×), drag to move the page, **double-tap the middle** to zoom in and out. The speech bubbles zoom with the page. On a double-page spread held upright Horu points this out once; turning the phone sideways also works.
 - **Tap a speech bubble** to open it. Then:
   - words you do not know yet are **underlined** (strongly for new, faintly for words you are learning), like in the text reader;

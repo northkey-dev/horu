@@ -8,7 +8,7 @@ import { getSettings } from '../config.ts';
 import { looksChinese, looksJapanese } from '../../../shared/lang.ts';
 import { clampFrame, keepFramed } from '../../../shared/frames.ts';
 import { friendlyMangaError } from '../../../shared/mangaErrors.ts';
-import { keptFor, pickChapters } from '../../../shared/sourceChapters.ts';
+import { keptFor, passedOver, pickChapters } from '../../../shared/sourceChapters.ts';
 import { log } from '../log.ts';
 import { PyWorker } from '../pyworker.ts';
 import * as lib from './library.ts';
@@ -386,7 +386,9 @@ export async function syncWindows(): Promise<void> {
         // prepared when you finish this one, not before.
         const finished = Boolean(manga.chapterKey && lib.getChapter(manga.chapterKey)?.readAt);
         const start = finished ? current + 1 : current;
-        sorted.slice(start, start + ahead).forEach((c) => {
+        // Chapters passed over before your place are prepared too, the earliest first.
+        const missed = passedOver(chapters, sorted, current, (c) => Boolean(lib.getChapter(`c${c.id}`)?.readAt)).slice(0, ahead);
+        [...missed, ...sorted.slice(start, start + ahead)].forEach((c) => {
           const key = `c${c.id}`;
           windowKeys.add(key);
           const existing = lib.getChapter(key);
