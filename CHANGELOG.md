@@ -2,6 +2,10 @@
 
 Release numbers follow `package.json`. The app, the laptop service and the Chrome extension share one number.
 
+## 1.6.3 (2026-11-17)
+
+Manga on a weak connection: **pages no longer hang forever.** With the laptop on the phone's hotspot, Tailscale goes through a relay and a page request now and then stalls without failing. The reader then showed its spinner for good, and *Save on phone* stopped (Kagurabachi ch. 8 at 50 %). Now a page request that gets no data for 15 s is cut and asked again (up to 4 times), in the reader and when saving. Laptop unchanged.
+
 ## 1.6.2 (2026-11-17)
 
 Manga reader: **phone sideways = page as wide as the screen.** The page was always fitted whole into the screen, so held sideways (little height, minus the bars) a double-page spread stayed small. Now it fills the width, the bars hide (tap the middle for them), and a drag up or down moves along the page. Page and bars keep clear of the notch. Laptop unchanged.

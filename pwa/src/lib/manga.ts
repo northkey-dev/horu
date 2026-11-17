@@ -106,6 +106,50 @@ async function get<T>(path: string): Promise<T> {
   return data as T;
 }
 
+// Over a weak link (laptop on the phone's hotspot, Tailscale through a relay) a page request can stall
+// without ever failing. One that gets no data for this long is dropped and asked again.
+const PAGE_STALL = 15_000;
+const PAGE_TRIES = 4;
+
+/** The laptop answered a page request with an error status (not worth asking again). */
+export class PageStatusError extends Error {}
+
+/** A page image as a blob: stalled requests are cut and tried again, up to PAGE_TRIES times. */
+export async function fetchPage(url: string, signal?: AbortSignal): Promise<Blob> {
+  for (let attempt = 1; ; attempt++) {
+    signal?.throwIfAborted();
+    const ctl = new AbortController();
+    const cut = () => ctl.abort();
+    signal?.addEventListener('abort', cut, { once: true });
+    let timer = setTimeout(cut, PAGE_STALL);
+    const moving = () => {
+      clearTimeout(timer);
+      timer = setTimeout(cut, PAGE_STALL);
+    };
+    try {
+      const res = await fetch(url, { credentials: 'same-origin', signal: ctl.signal });
+      if (!res.ok) throw new PageStatusError(`HTTP ${res.status}`);
+      const type = res.headers.get('Content-Type') ?? 'image/jpeg';
+      if (!res.body) return new Blob([await res.arrayBuffer()], { type });
+      const reader = res.body.getReader();
+      const parts: BlobPart[] = [];
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        parts.push(value);
+        moving();
+      }
+      return new Blob(parts, { type });
+    } catch (e) {
+      if (signal?.aborted || e instanceof PageStatusError) throw e;
+      if (attempt >= PAGE_TRIES) throw new Error('The connection to the laptop keeps stalling (weak network). Try again; pages loaded so far stay.');
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', cut);
+    }
+  }
+}
+
 /** An error from a laptop call in words for the reader of the screen. */
 export function describeError(e: unknown): string {
   const err = e as Error;
@@ -339,8 +383,12 @@ async function cacheChapter(cache: Cache, c: { key: string; files: string[] }, t
     signal?.throwIfAborted();
     const url = fileUrl(c.key, file);
     if (!(await cache.match(url))) {
-      const res = await fetch(url, { credentials: 'same-origin', signal: AbortSignal.timeout(LAPTOP_WAIT) });
-      if (res.ok) await cache.put(url, res);
+      try {
+        const blob = await fetchPage(url, signal);
+        await cache.put(url, new Response(blob, { headers: { 'Content-Type': blob.type } }));
+      } catch (e) {
+        if (!(e instanceof PageStatusError)) throw e; // a page the laptop does not have is left out, as before
+      }
     }
     tick();
   }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { navigate } from '../lib/hooks.ts';
-import { describeError, enShift, fileUrl, loadChapter, mangaApi, mangaLangByKey, mineLine, offlineChaptersOf, reportProgress, savedPage, setEnShift, type ChapterData } from '../lib/manga.ts';
+import { describeError, enShift, fetchPage, fileUrl, loadChapter, mangaApi, mangaLangByKey, mineLine, offlineChaptersOf, reportProgress, savedPage, setEnShift, type ChapterData } from '../lib/manga.ts';
 import { dragFrame, type Box, type Grip } from '../../../shared/frames.ts';
 import { looksChinese } from '../../../shared/lang.ts';
 import { TokenText, isWord } from '../components/TokenText.tsx';
@@ -64,11 +64,7 @@ const pageSrc = new Map<string, Promise<string>>(); // page URL → object URL (
 function loadPage(url: string): Promise<string> {
   let p = pageSrc.get(url);
   if (!p) {
-    p = fetch(url, { credentials: 'same-origin' })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.blob();
-      })
+    p = fetchPage(url)
       .then((blob) => URL.createObjectURL(blob))
       .catch(() => {
         pageSrc.delete(url); // tried again the next time it is asked for
