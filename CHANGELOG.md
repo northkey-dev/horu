@@ -2,6 +2,10 @@
 
 Release numbers follow `package.json`. The app, the laptop service and the Chrome extension share one number.
 
+## 1.6.6 (2026-11-18)
+
+**Horu on the computer:** the manga reader takes the keyboard (← next page, → page before, the other way round on the English side; Space / Page Down, Page Up; Esc closes the word sheet or the zoom). README: new part *On the computer too* (tray → *Open Horu* or http://localhost:7317, same inbox, library and place as the phone; what stays per device). Laptop unchanged.
+
 ## 1.6.5 (2026-11-18)
 
 Manga reader: **back from the first page lands on the last page of the chapter before**, not on its page 1. Laptop unchanged.

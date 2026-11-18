@@ -441,6 +441,34 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
   };
   goRef.current = go;
 
+  // Keyboard (computer): arrows turn the page the way the book reads (left = next in Japanese), Space and
+  // Page Down go on, Page Up goes back, Escape closes the bubble or the zoom.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.altKey || e.ctrlKey || e.metaKey || frameRef.current) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (e.key === 'Escape') {
+        if (zoomRef.current.s > 1) setZoom(NO_ZOOM);
+        else setBlock(undefined);
+        return;
+      }
+      if (t?.closest('.sheet')) return; // a button in the word sheet has the focus: keys belong to it
+      const ltr = englishRef.current;
+      let delta = 0;
+      if (e.key === 'ArrowLeft') delta = ltr ? -1 : 1;
+      else if (e.key === 'ArrowRight') delta = ltr ? 1 : -1;
+      else if (e.key === 'PageDown' || (e.key === ' ' && !e.shiftKey)) delta = 1;
+      else if (e.key === 'PageUp' || (e.key === ' ' && e.shiftKey)) delta = -1;
+      if (!delta) return;
+      e.preventDefault();
+      if (zoomRef.current.s > 1) setZoom(NO_ZOOM);
+      goRef.current(delta);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   // Touch gestures: pinch zooms, a drag moves the zoomed page, a swipe turns the page, a double tap in the
   // middle zooms in and out. Page turns by tapping the edges stay instant (no waiting for a second tap).
   useEffect(() => {

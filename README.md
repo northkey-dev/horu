@@ -117,6 +117,14 @@ Phone and laptop sync whenever both are reachable; marks made on the phone alone
 
 **Laptop switched off?** The app on your home screen keeps working from what the phone stored and shows *Laptop not reachable* with the likely reason (no internet, no answer, or Tailscale not connected), which app version the saved copy is, and a **Check again** button. It starts after about 3 seconds. You can still mark moments, read texts and saved manga chapters, look up words and make `.apkg` cards. Screenshots and audio from the laptop, Whisper, manga sources, text recognition and reminders wait until it is back. Only two things need the laptop on: adding the app to the home screen and opening it once or twice afterwards, so it can store everything (about 40 MB), and getting a new version.
 
+### On the computer too
+
+The same app runs in the browser on the laptop: tray icon → **Open Horu**, or open http://localhost:7317 (from another computer at home: the `https://<name>.<tailnet>.ts.net` address with Tailscale). Inbox, history, manga library and your place in each manga live on the laptop, so a chapter you stopped on the phone carries on there and the other way round. In Chrome or Edge, the install icon in the address bar (*Install Horu*) gives it its own window and a Start menu entry.
+
+In the manga reader: **←** next page, **→** page before (the other way round on the English side), **Space** / **Page Down** next, **Page Up** back, **Esc** closes the word sheet or the zoom. A click on the left or right third turns the page too, a double click in the middle zooms, a click on a bubble opens it.
+
+What stays per device: settings marked *This phone*, reader options, *Fix the text* corrections, the Texts library (texts and books are kept in the device that added them), chapters saved for offline. Microphone, camera and Back Tap are phone things.
+
 ## The Study tab
 
 The fifth tab, **Study**, has three parts at the top: **Practice** (what you do), **Kanji** (what you collect) and **Progress** (how you are doing).
