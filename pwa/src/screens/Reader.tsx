@@ -59,6 +59,9 @@ function clampZoom(z: Zoom, w: number, h: number): Zoom {
 // wait. So the whole chapter is fetched as soon as it opens, nearest pages first, and kept as blobs on the
 // phone; near the end the next chapter's first pages follow. Only the open and the next chapter are kept.
 // Each page is fetched once: the page on screen and the background loader share the same request.
+// The chapter to open on its last page (set when paging back past the first page of the next one)
+let openAtEnd: string | undefined;
+
 const pageSrc = new Map<string, Promise<string>>(); // page URL → object URL (the URL itself if the fetch failed)
 
 function loadPage(url: string): Promise<string> {
@@ -179,7 +182,9 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
         // its last page was finished, and starts over.
         const lib = mangaApi.cachedLibrary().find((m) => m.key === d.mangaKey);
         const left = savedPage(chapterKey) ?? (lib?.chapterKey === chapterKey ? lib.page : undefined) ?? 0;
-        setPage(left >= d.pages.length - 1 ? 0 : left);
+        if (openAtEnd === chapterKey) setPage(d.pages.length - 1);
+        else setPage(left >= d.pages.length - 1 ? 0 : left);
+        openAtEnd = undefined;
         // Chapters readable right now: offline copies plus (when online) ready ones on the laptop.
         const offline = offlineChaptersOf(d.mangaKey).map((c) => ({ key: c.key, order: c.order }));
         setReady(offline);
@@ -426,7 +431,10 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
       return;
     }
     if (target < 0) {
-      if (neighbours.prev) navigate(`manga/read/${neighbours.prev.key}`);
+      if (neighbours.prev) {
+        openAtEnd = neighbours.prev.key; // back from the first page: carry on from the end of the chapter before
+        navigate(`manga/read/${neighbours.prev.key}`);
+      }
       return;
     }
     setPage(target);

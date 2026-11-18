@@ -2,6 +2,10 @@
 
 Release numbers follow `package.json`. The app, the laptop service and the Chrome extension share one number.
 
+## 1.6.5 (2026-11-18)
+
+Manga reader: **back from the first page lands on the last page of the chapter before**, not on its page 1. Laptop unchanged.
+
 ## 1.6.4 (2026-11-18)
 
 Manga reader: **the next chapter starts on page 1.** Moving on at the end of a chapter saved the page you were on (e.g. 18) as the new chapter's place for a moment, before the new chapter had loaded, so it opened there. Laptop unchanged.
