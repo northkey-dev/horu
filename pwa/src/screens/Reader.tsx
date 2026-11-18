@@ -102,7 +102,10 @@ async function fetchPages(urls: string[], alive: () => boolean): Promise<void> {
 }
 
 export function Reader({ chapterKey }: { chapterKey: string }) {
-  const [data, setData] = useState<ChapterData>();
+  // The chapter's data, with the chapter it belongs to: right after moving on to the next chapter `chapterKey` is
+  // new while the old data (and page) are still in state, and the old page must not be saved as the new chapter's.
+  const [loaded, setLoaded] = useState<{ chapterKey: string; data: ChapterData }>();
+  const data = loaded?.chapterKey === chapterKey ? loaded.data : undefined;
   const [error, setError] = useState<string>();
   const [page, setPage] = useState(0);
   const [chrome, setChrome] = useState(true);
@@ -155,7 +158,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
   const [shift, setShift] = useState(0);
 
   useEffect(() => {
-    setData(undefined);
+    setLoaded(undefined);
     setShown(undefined);
     setError(undefined);
     setBlock(undefined);
@@ -166,7 +169,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
         const en = mangaLangByKey(d.mangaKey) === 'en';
         setEnglish(en);
         setShift(enShift(d.mangaKey));
-        setData(d);
+        setLoaded({ chapterKey, data: d });
         if (!en) {
           const snapshot = snapshotOf(d, chapterKey, bubbleEdits());
           snapshot.catch(() => undefined);
@@ -599,7 +602,7 @@ export function Reader({ chapterKey }: { chapterKey: string }) {
     try {
       const fixed = await mangaApi.readFrame(chapterKey, at, block, frame);
       if (run !== frameRead.current) return;
-      setData((d) => d && { ...d, pages: d.pages.map((p, i) => (i === at ? { ...p, blocks: p.blocks.map((b, k) => (k === block ? fixed : b)) } : p)) });
+      setLoaded((l) => l && { ...l, data: { ...l.data, pages: l.data.pages.map((p, i) => (i === at ? { ...p, blocks: p.blocks.map((b, k) => (k === block ? fixed : b)) } : p)) } });
       setEdits(saveBubbleEdit(editKey(block), undefined)); // a correction by hand belonged to the old text
       setFrame(undefined);
     } catch (e) {
